@@ -4,6 +4,8 @@
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+    nix.url = "github:tweag/nix/nix-c-bindings";
+    nix.inputs.nixpkgs.follows = "nixpkgs";
     nix-cargo-integration.url = "github:yusdacra/nix-cargo-integration";
     nix-cargo-integration.inputs.nixpkgs.follows = "nixpkgs";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -23,22 +25,42 @@
         systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
         perSystem = { config, self', inputs', pkgs, ... }: {
 
+
+          packages.nix = inputs'.nix.packages.nix.overrideAttrs {
+            # checkPhase does not seem to terminate.
+            # TODO: remove override
+            doCheck = false;
+          };
+
           pre-commit.settings.hooks.nixpkgs-fmt.enable = true;
           pre-commit.settings.hooks.rustfmt.enable = true;
           # Override to pass `--all`
           pre-commit.settings.hooks.rustfmt.entry = lib.mkForce "${pkgs.rustfmt}/bin/cargo-fmt fmt --all --manifest-path ./rust/Cargo.toml -- --color always";
 
           devShells.default = pkgs.mkShell {
+            name = "nix-bindings-devshell";
+            strictDeps = true;
             inputsFrom = [ config.nci.outputs.nix-bindings.devShell ];
+            inherit (config.nci.outputs.nix-bindings.devShell.env)
+              LIBCLANG_PATH
+              BINDGEN_EXTRA_CLANG_ARGS
+              ;
+            buildInputs = [
+              config.packages.nix
+            ];
             nativeBuildInputs = [
               pkgs.rust-analyzer
               pkgs.nixpkgs-fmt
               pkgs.rustfmt
+              pkgs.pkg-config
+              pkgs.clang-tools # clangd
             ];
             shellHook = ''
               ${config.pre-commit.installationScript}
               echo 1>&2 "Welcome to the development shell!"
             '';
+            # rust-analyzer needs a NIX_PATH for some reason
+            NIX_PATH = "nixpkgs=${inputs.nixpkgs}";
           };
         };
         flake = { };
