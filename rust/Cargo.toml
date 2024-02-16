@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "nix-c-raw",
+    "nix-util",
 ]
 resolver = "2"
