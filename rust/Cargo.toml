@@ -2,5 +2,6 @@
 members = [
     "nix-c-raw",
     "nix-util",
+    "nix-store",
 ]
 resolver = "2"
