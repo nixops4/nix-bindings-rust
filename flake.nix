@@ -9,7 +9,8 @@
     nix-cargo-integration.url = "github:yusdacra/nix-cargo-integration";
     nix-cargo-integration.inputs.nixpkgs.follows = "nixpkgs";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    pre-commit-hooks-nix.url = "github:cachix/pre-commit-hooks.nix";
+    # https://github.com/cachix/pre-commit-hooks.nix/pull/410
+    pre-commit-hooks-nix.url = "github:hercules-ci/pre-commit-hooks.nix/rustfmt-all";
     pre-commit-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -26,14 +27,14 @@
         perSystem = { config, self', inputs', pkgs, ... }: {
 
 
-          
+
           packages.nix = inputs'.nix.packages.nix;
 
           pre-commit.settings.hooks.nixpkgs-fmt.enable = true;
           # Temporarily disable rustfmt due to configuration issues
           # pre-commit.settings.hooks.rustfmt.enable = true;
-          # Override to pass `--all`
-          # pre-commit.settings.hooks.rustfmt.entry = lib.mkForce "${pkgs.rustfmt}/bin/cargo-fmt fmt --all --manifest-path ./rust/Cargo.toml -- --color always";
+          # New configuration for rustfmt
+          pre-commit.settings.settings.rust.cargoManifestPath = "./rust/Cargo.toml";
 
           devShells.default = pkgs.mkShell {
             name = "nix-bindings-devshell";
