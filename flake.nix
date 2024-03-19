@@ -26,11 +26,8 @@
         perSystem = { config, self', inputs', pkgs, ... }: {
 
 
-          packages.nix = inputs'.nix.packages.nix.overrideAttrs {
-            # checkPhase does not seem to terminate.
-            # TODO: remove override
-            doCheck = false;
-          };
+          
+          packages.nix = inputs'.nix.packages.nix;
 
           pre-commit.settings.hooks.nixpkgs-fmt.enable = true;
           # Temporarily disable rustfmt due to configuration issues
