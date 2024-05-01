@@ -43,6 +43,15 @@
               LIBCLANG_PATH
               BINDGEN_EXTRA_CLANG_ARGS
               ;
+            NIX_DEBUG_INFO_DIRS =
+              let
+                # TODO: add to Nixpkgs lib
+                getDebug = pkg:
+                  if pkg?debug then pkg.debug
+                  else if pkg?lib then pkg.lib
+                  else pkg;
+              in
+              "${getDebug config.packages.nix}/lib/debug";
             buildInputs = [
               config.packages.nix
             ];
