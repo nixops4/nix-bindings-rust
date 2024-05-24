@@ -35,6 +35,26 @@
           # New configuration for rustfmt
           pre-commit.settings.settings.rust.cargoManifestPath = "./rust/Cargo.toml";
 
+          # Check that we're using ///-style doc comments in Rust code.
+          #
+          # Unfortunately, rustfmt won't do this for us yet - at least not
+          # without nightly, and it might do too much.
+          pre-commit.settings.hooks.rust-doc-comments = {
+            enable = true;
+            files = ".*.rs$";
+            entry = "${pkgs.writeScript "rust-doc-comments" ''
+              #!${pkgs.runtimeShell}
+              set -uxo pipefail
+              grep -n -C3 --color=always -F '/**' "$@"
+              r=$?
+              set -e
+              if [ $r -eq 0 ]; then
+                echo "Please replace /**-style comments by /// style comments in Rust code."
+                exit 1
+              fi
+            ''}";
+          };
+
           devShells.default = pkgs.mkShell {
             name = "nix-bindings-devshell";
             strictDeps = true;
