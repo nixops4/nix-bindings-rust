@@ -1050,6 +1050,7 @@ mod tests {
         .unwrap();
     }
 
+    /// This tests the behavior of `call`, which is strict, unlike `new_value_apply`.
     #[test]
     fn eval_state_call_fail_args() {
         gc_registering_current_thread(|| {
@@ -1071,8 +1072,9 @@ mod tests {
         .unwrap();
     }
 
+    /// This tests the behavior of `new_value_apply`, which is lazy, unlike `call`.
     #[test]
-    fn eval_state_apply_fail_args() {
+    fn eval_state_apply_fail_args_lazy() {
         gc_registering_current_thread(|| {
             let store = Store::open("auto", HashMap::new()).unwrap();
             let es = EvalState::new(store, []).unwrap();
