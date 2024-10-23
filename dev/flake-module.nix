@@ -90,5 +90,15 @@
     {
       ciSystems = [ "x86_64-linux" ];
     };
+  hercules-ci.flake-update = {
+    enable = true;
+    baseMerge.enable = true;
+    autoMergeMethod = "merge";
+    when = { dayOfMonth = 2; };
+    flakes = {
+      "." = { };
+      "dev" = { };
+    };
+  };
   flake = { };
 }
