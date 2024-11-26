@@ -1,5 +1,5 @@
 {
-  description = "A flake with pre-commit hooks";
+  description = "Rust bindings for the Nix C API";
 
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";
