@@ -36,7 +36,7 @@
       inputsFrom = [ config.nci.outputs.nix-bindings.devShell ];
       inherit (config.nci.outputs.nix-bindings.devShell.env)
         LIBCLANG_PATH
-        BINDGEN_EXTRA_CLANG_ARGS
+        NIX_CC_UNWRAPPED
         ;
       NIX_DEBUG_INFO_DIRS =
         let
@@ -66,6 +66,7 @@
       ];
       shellHook = ''
         ${config.pre-commit.installationScript}
+        source ${../rust/bindgen-gcc.sh}
         echo 1>&2 "Welcome to the development shell!"
       '';
       # rust-analyzer needs a NIX_PATH for some reason
