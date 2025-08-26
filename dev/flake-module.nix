@@ -5,7 +5,7 @@
   ];
   perSystem = { config, pkgs, ... }: {
 
-    pre-commit.settings.hooks.nixpkgs-fmt.enable = true;
+    pre-commit.settings.hooks.nixfmt-rfc-style.enable = true;
     # Temporarily disable rustfmt due to configuration issues
     # pre-commit.settings.hooks.rustfmt.enable = true;
     pre-commit.settings.settings.rust.cargoManifestPath = "./rust/Cargo.toml";
@@ -52,7 +52,7 @@
       ];
       nativeBuildInputs = [
         pkgs.rust-analyzer
-        pkgs.nixpkgs-fmt
+        pkgs.nixfmt-rfc-style
         pkgs.rustfmt
         pkgs.pkg-config
         pkgs.clang-tools # clangd
