@@ -10,19 +10,36 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = inputs@{ self, flake-parts, ... }:
-    flake-parts.lib.mkFlake
-      { inherit inputs; }
-      ({ lib, ... }: {
+  outputs =
+    inputs@{ self, flake-parts, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } (
+      {
+        lib,
+        ...
+      }:
+      {
         imports = [
           inputs.nix-cargo-integration.flakeModule
           inputs.flake-parts.flakeModules.partitions
           ./rust/nci.nix
         ];
-        systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
-        perSystem = { config, self', inputs', pkgs, ... }: {
-          packages.nix = inputs'.nix.packages.nix;
-        };
+        systems = [
+          "x86_64-linux"
+          "aarch64-linux"
+          "x86_64-darwin"
+          "aarch64-darwin"
+        ];
+        perSystem =
+          {
+            config,
+            self',
+            inputs',
+            pkgs,
+            ...
+          }:
+          {
+            packages.nix = inputs'.nix.packages.nix;
+          };
 
         partitionedAttrs.devShells = "dev";
         partitionedAttrs.checks = "dev";
@@ -31,5 +48,6 @@
         partitions.dev.module = {
           imports = [ ./dev/flake-module.nix ];
         };
-      });
+      }
+    );
 }
