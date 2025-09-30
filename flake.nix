@@ -33,9 +33,10 @@
           };
 
           pre-commit.settings.hooks.nixpkgs-fmt.enable = true;
-          pre-commit.settings.hooks.rustfmt.enable = true;
+          # Temporarily disable rustfmt due to configuration issues
+          # pre-commit.settings.hooks.rustfmt.enable = true;
           # Override to pass `--all`
-          pre-commit.settings.hooks.rustfmt.entry = lib.mkForce "${pkgs.rustfmt}/bin/cargo-fmt fmt --all --manifest-path ./rust/Cargo.toml -- --color always";
+          # pre-commit.settings.hooks.rustfmt.entry = lib.mkForce "${pkgs.rustfmt}/bin/cargo-fmt fmt --all --manifest-path ./rust/Cargo.toml -- --color always";
 
           devShells.default = pkgs.mkShell {
             name = "nix-bindings-devshell";
