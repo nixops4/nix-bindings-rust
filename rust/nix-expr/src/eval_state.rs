@@ -348,7 +348,7 @@ mod tests {
             let store = Store::open("auto").unwrap();
             let es = EvalState::new(store).unwrap();
             let v = es
-                .eval_from_string("[ ]".to_string(), "<test>".to_string())
+                .eval_from_string("[ ]", "<test>")
                 .unwrap();
             es.force(&v).unwrap();
             let t = es.value_type(&v).unwrap();
