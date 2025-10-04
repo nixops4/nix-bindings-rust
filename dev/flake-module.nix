@@ -94,7 +94,9 @@
     enable = true;
     baseMerge.enable = true;
     autoMergeMethod = "merge";
-    when = { dayOfMonth = 2; };
+    when = {
+      dayOfMonth = 1;
+    };
     flakes = {
       "." = { };
       "dev" = { };
