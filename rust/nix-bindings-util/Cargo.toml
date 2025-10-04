@@ -1,5 +1,5 @@
 [package]
-name = "nix-util"
+name = "nix-bindings-util"
 version = "0.1.0"
 edition = "2021"
 license = "LGPL-2.1"
@@ -9,5 +9,5 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-nix-c-raw = { path = "../nix-c-raw" }
+nix-bindings-bindgen-raw = { path = "../nix-bindings-bindgen-raw" }
 ctor = "0.2"

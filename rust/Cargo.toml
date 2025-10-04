@@ -1,10 +1,10 @@
 [workspace]
 members = [
-    "nix-c-raw",
-    "nix-expr",
-    "nix-fetchers",
-    "nix-flake",
-    "nix-store",
-    "nix-util",
+    "nix-bindings-bindgen-raw",
+    "nix-bindings-expr",
+    "nix-bindings-fetchers",
+    "nix-bindings-flake",
+    "nix-bindings-store",
+    "nix-bindings-util",
 ]
 resolver = "2"

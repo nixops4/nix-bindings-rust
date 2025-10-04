@@ -1,9 +1,9 @@
 use anyhow::{bail, Error, Result};
 use lazy_static::lazy_static;
-use nix_c_raw as raw;
-use nix_util::context::Context;
-use nix_util::string_return::{callback_get_result_string, callback_get_result_string_data};
-use nix_util::{check_call, result_string_init};
+use nix_bindings_bindgen_raw as raw;
+use nix_bindings_util::context::Context;
+use nix_bindings_util::string_return::{callback_get_result_string, callback_get_result_string_data};
+use nix_bindings_util::{check_call, result_string_init};
 use std::collections::HashMap;
 use std::ffi::{c_char, CString};
 use std::ptr::null_mut;

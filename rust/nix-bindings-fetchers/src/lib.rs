@@ -1,6 +1,6 @@
 use anyhow::{Context as _, Result};
-use nix_c_raw as raw;
-use nix_util::context::{self, Context};
+use nix_bindings_bindgen_raw as raw;
+use nix_bindings_util::context::{self, Context};
 use std::ptr::NonNull;
 
 pub struct FetchersSettings {

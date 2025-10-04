@@ -1,8 +1,8 @@
-# nix-c-raw
+# nix-bindings-bindgen-raw
 
 This crate contains generated bindings for the Nix C API.
 **You should not have to use this crate directly,** and so you should probably not add it to your dependencies.
-Instead, use the `nix-util`, `nix-store` and `nix-expr` crates, which _should_ be sufficient.
+Instead, use the `nix-bindings-util`, `nix-bindings-store` and `nix-bindings-expr` crates, which _should_ be sufficient.
 
 ## Design
 

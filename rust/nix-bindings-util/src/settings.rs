@@ -1,5 +1,5 @@
 use anyhow::Result;
-use nix_c_raw as raw;
+use nix_bindings_bindgen_raw as raw;
 use std::sync::Mutex;
 
 use crate::{

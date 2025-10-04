@@ -1,8 +1,8 @@
 use crate::eval_state::{EvalState, EvalStateWeak};
 use crate::value::Value;
 use anyhow::Result;
-use nix_c_raw as raw;
-use nix_util::check_call;
+use nix_bindings_bindgen_raw as raw;
+use nix_bindings_util::check_call;
 use std::ffi::{c_int, c_void, CStr, CString};
 use std::mem::ManuallyDrop;
 use std::ptr::{null, null_mut};

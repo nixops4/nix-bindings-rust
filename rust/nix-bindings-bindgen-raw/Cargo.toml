@@ -1,5 +1,5 @@
 [package]
-name = "nix-store"
+name = "nix-bindings-bindgen-raw"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
@@ -8,11 +8,6 @@ license = "LGPL-2.1"
 [lib]
 path = "src/lib.rs"
 
-[dependencies]
-anyhow = "1.0"
-nix-util = { path = "../nix-util" }
-nix-c-raw = { path = "../nix-c-raw" }
-lazy_static = "1.4"
-
 [build-dependencies]
+bindgen = "0.69"
 pkg-config = "0.3"

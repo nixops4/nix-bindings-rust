@@ -1,10 +1,10 @@
 use anyhow::{bail, Result};
-use nix_c_raw as raw;
+use nix_bindings_bindgen_raw as raw;
 use std::os::raw::c_char;
 use std::ptr::null_mut;
 use std::ptr::NonNull;
 
-/// A context for error handling, when interacting directly with the generated bindings for the C API in [nix_c_raw].
+/// A context for error handling, when interacting directly with the generated bindings for the C API in [nix_bindings_bindgen_raw].
 ///
 /// The `nix-store` and `nix-expr` libraries that consume this type internally store a private context in their `EvalState` and `Store` structs to avoid allocating a new context for each operation. The state of a context is irrelevant when used correctly (e.g. with [check_call!]), so it's safe to reuse, and safe to allocate more contexts in methods such as [Clone::clone].
 pub struct Context {

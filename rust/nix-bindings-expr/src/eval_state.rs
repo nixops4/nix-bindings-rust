@@ -17,8 +17,8 @@
 //! Create an [`EvalState`] using [`EvalState::new`] or [`EvalStateBuilder`] for advanced configuration:
 //!
 //! ```rust
-//! # use nix_expr::eval_state::{EvalState, EvalStateBuilder, test_init, gc_register_my_thread};
-//! # use nix_store::store::Store;
+//! # use nix_bindings_expr::eval_state::{EvalState, EvalStateBuilder, test_init, gc_register_my_thread};
+//! # use nix_bindings_store::store::Store;
 //! # use std::collections::HashMap;
 //! # fn example() -> anyhow::Result<()> {
 //! # test_init(); let guard = gc_register_my_thread()?;
@@ -71,7 +71,7 @@
 //! Before using [`EvalState`] in a thread, register it with the (process memory) garbage collector:
 //!
 //! ```rust,no_run
-//! # use nix_expr::eval_state::{init, gc_register_my_thread, test_init};
+//! # use nix_bindings_expr::eval_state::{init, gc_register_my_thread, test_init};
 //! # fn example() -> anyhow::Result<()> {
 //! # test_init(); // Use test_init() in tests
 //! init()?; // Initialize Nix library
@@ -92,8 +92,8 @@
 //! ## Examples
 //!
 //! ```rust
-//! use nix_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
-//! use nix_store::store::Store;
+//! use nix_bindings_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
+//! use nix_bindings_store::store::Store;
 //! use std::collections::HashMap;
 //!
 //! # fn main() -> anyhow::Result<()> {
@@ -134,12 +134,12 @@ use anyhow::Context as _;
 use anyhow::{bail, Result};
 use cstr::cstr;
 use lazy_static::lazy_static;
-use nix_c_raw as raw;
-use nix_store::path::StorePath;
-use nix_store::store::{Store, StoreWeak};
-use nix_util::context::Context;
-use nix_util::string_return::{callback_get_result_string, callback_get_result_string_data};
-use nix_util::{check_call, check_call_opt_key, result_string_init};
+use nix_bindings_bindgen_raw as raw;
+use nix_bindings_store::path::StorePath;
+use nix_bindings_store::store::{Store, StoreWeak};
+use nix_bindings_util::context::Context;
+use nix_bindings_util::string_return::{callback_get_result_string, callback_get_result_string_data};
+use nix_bindings_util::{check_call, check_call_opt_key, result_string_init};
 use std::ffi::{c_char, CString};
 use std::iter::FromIterator;
 use std::os::raw::c_uint;
@@ -162,7 +162,7 @@ pub fn init() -> Result<()> {
         Ok(_) => Ok(()),
         Err(e) => {
             // Couldn't just clone the error, so we have to print it here.
-            Err(anyhow::format_err!("nix_expr::init error: {}", e))
+            Err(anyhow::format_err!("nix_bindings_expr::init error: {}", e))
         }
     }
 }
@@ -225,8 +225,8 @@ impl Drop for EvalStateRef {
 /// # Examples
 ///
 /// ```rust
-/// # use nix_expr::eval_state::{EvalState, EvalStateBuilder, test_init, gc_register_my_thread};
-/// # use nix_store::store::Store;
+/// # use nix_bindings_expr::eval_state::{EvalState, EvalStateBuilder, test_init, gc_register_my_thread};
+/// # use nix_bindings_store::store::Store;
 /// # use std::collections::HashMap;
 /// # fn example() -> anyhow::Result<()> {
 /// # test_init();
@@ -369,9 +369,9 @@ impl EvalState {
     /// # Examples
     ///
     /// ```
-    /// # use nix_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
-    /// use nix_store::store::Store;
-    /// use nix_expr::value::Value;
+    /// # use nix_bindings_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
+    /// use nix_bindings_store::store::Store;
+    /// use nix_bindings_expr::value::Value;
     /// use std::collections::HashMap;
     ///
     /// # fn main() -> anyhow::Result<()> {
@@ -474,8 +474,8 @@ impl EvalState {
     /// # Examples
     ///
     /// ```rust
-    /// # use nix_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
-    /// # use nix_store::store::Store;
+    /// # use nix_bindings_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
+    /// # use nix_bindings_store::store::Store;
     /// # use std::collections::HashMap;
     /// # fn example() -> anyhow::Result<()> {
     /// # test_init();
@@ -529,9 +529,9 @@ impl EvalState {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// # use nix_expr::value::Value;
+    /// # use nix_bindings_expr::value::Value;
     /// # use std::collections::{VecDeque, LinkedList};
-    /// # fn example(es: &mut nix_expr::eval_state::EvalState, list_value: &Value) -> anyhow::Result<()> {
+    /// # fn example(es: &mut nix_bindings_expr::eval_state::EvalState, list_value: &Value) -> anyhow::Result<()> {
     /// let vec: Vec<Value> = es.require_list_strict(&list_value)?;
     /// let deque: VecDeque<Value> = es.require_list_strict(&list_value)?;
     /// let linked_list = es.require_list_strict::<LinkedList<Value>>(&list_value)?;
@@ -942,8 +942,8 @@ impl EvalState {
     /// # Examples
     ///
     /// ```rust
-    /// # use nix_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
-    /// # use nix_store::store::Store;
+    /// # use nix_bindings_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
+    /// # use nix_bindings_store::store::Store;
     /// # use std::collections::HashMap;
     /// # fn example() -> anyhow::Result<()> {
     /// # test_init();
@@ -1043,8 +1043,8 @@ impl EvalState {
     /// # Examples
     ///
     /// ```rust
-    /// # use nix_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
-    /// # use nix_store::store::Store;
+    /// # use nix_bindings_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
+    /// # use nix_bindings_store::store::Store;
     /// # use std::collections::HashMap;
     /// # fn example() -> anyhow::Result<()> {
     /// # test_init();
@@ -1211,18 +1211,18 @@ pub fn test_init() {
     // would cause the test suite to reinvokes itself, causing an infinite loop.
     // While _NIX_TEST_NO_SANDBOX=1 should prevent this, we may also set the
     // build hook to "" to prevent this.
-    nix_util::settings::set("build-hook", "").unwrap();
+    nix_bindings_util::settings::set("build-hook", "").unwrap();
 
     // When testing in the sandbox, the default build dir would be a parent of the storeDir,
     // which causes an error. So we set a custom build dir here.
     // Only available on linux
     if cfg!(target_os = "linux") {
-        nix_util::settings::set("sandbox-build-dir", "/custom-build-dir-for-test").unwrap();
+        nix_bindings_util::settings::set("sandbox-build-dir", "/custom-build-dir-for-test").unwrap();
     }
     std::env::set_var("_NIX_TEST_NO_SANDBOX", "1");
 
     // The tests run offline
-    nix_util::settings::set("substituters", "").unwrap();
+    nix_bindings_util::settings::set("substituters", "").unwrap();
 }
 
 #[cfg(test)]

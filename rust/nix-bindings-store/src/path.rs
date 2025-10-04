@@ -1,8 +1,8 @@
 use std::ptr::NonNull;
 
 use anyhow::Result;
-use nix_c_raw as raw;
-use nix_util::{
+use nix_bindings_bindgen_raw as raw;
+use nix_bindings_util::{
     result_string_init,
     string_return::{callback_get_result_string, callback_get_result_string_data},
 };
@@ -60,7 +60,7 @@ impl StorePath {
     /// # Safety
     ///
     /// This function is unsafe because it returns a raw pointer. The caller must ensure that the pointer is not used beyond the lifetime of this `StorePath`.
-    pub unsafe fn as_ptr(&self) -> *mut nix_c_raw::StorePath {
+    pub unsafe fn as_ptr(&self) -> *mut raw::StorePath {
         self.raw.as_ptr()
     }
 }

@@ -1,7 +1,7 @@
 pub mod __private;
 
-use nix_c_raw as raw;
-use nix_util::{check_call, context::Context};
+use nix_bindings_bindgen_raw as raw;
+use nix_bindings_util::{check_call, context::Context};
 use std::ptr::{null_mut, NonNull};
 
 // TODO: test: cloning a thunk does not duplicate the evaluation.

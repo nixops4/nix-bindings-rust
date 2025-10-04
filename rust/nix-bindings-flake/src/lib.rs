@@ -1,10 +1,10 @@
 use std::{ffi::CString, os::raw::c_char, ptr::NonNull};
 
 use anyhow::{Context as _, Result};
-use nix_c_raw as raw;
-use nix_expr::eval_state::EvalState;
-use nix_fetchers::FetchersSettings;
-use nix_util::{
+use nix_bindings_bindgen_raw as raw;
+use nix_bindings_expr::eval_state::EvalState;
+use nix_bindings_fetchers::FetchersSettings;
+use nix_bindings_util::{
     context::{self, Context},
     result_string_init,
     string_return::{callback_get_result_string, callback_get_result_string_data},
@@ -29,7 +29,7 @@ impl FlakeSettings {
     }
     fn add_to_eval_state_builder(
         &self,
-        builder: &mut nix_expr::eval_state::EvalStateBuilder,
+        builder: &mut nix_bindings_expr::eval_state::EvalStateBuilder,
     ) -> Result<()> {
         let mut ctx = Context::new();
         unsafe {
@@ -45,14 +45,14 @@ impl FlakeSettings {
 
 pub trait EvalStateBuilderExt {
     /// Configures the eval state to provide flakes features such as `builtins.getFlake`.
-    fn flakes(self, settings: &FlakeSettings) -> Result<nix_expr::eval_state::EvalStateBuilder>;
+    fn flakes(self, settings: &FlakeSettings) -> Result<nix_bindings_expr::eval_state::EvalStateBuilder>;
 }
-impl EvalStateBuilderExt for nix_expr::eval_state::EvalStateBuilder {
+impl EvalStateBuilderExt for nix_bindings_expr::eval_state::EvalStateBuilder {
     /// Configures the eval state to provide flakes features such as `builtins.getFlake`.
     fn flakes(
         mut self,
         settings: &FlakeSettings,
-    ) -> Result<nix_expr::eval_state::EvalStateBuilder> {
+    ) -> Result<nix_bindings_expr::eval_state::EvalStateBuilder> {
         settings.add_to_eval_state_builder(&mut self)?;
         Ok(self)
     }
@@ -239,7 +239,7 @@ impl LockedFlake {
         &self,
         flake_settings: &FlakeSettings,
         eval_state: &mut EvalState,
-    ) -> Result<nix_expr::value::Value> {
+    ) -> Result<nix_bindings_expr::value::Value> {
         let mut ctx = Context::new();
         unsafe {
             let r = context::check_call!(raw::locked_flake_get_output_attrs(
@@ -248,15 +248,15 @@ impl LockedFlake {
                 eval_state.raw_ptr(),
                 self.ptr.as_ptr()
             ))?;
-            Ok(nix_expr::value::__private::raw_value_new(r))
+            Ok(nix_bindings_expr::value::__private::raw_value_new(r))
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use nix_expr::eval_state::{gc_register_my_thread, EvalStateBuilder};
-    use nix_store::store::Store;
+    use nix_bindings_expr::eval_state::{gc_register_my_thread, EvalStateBuilder};
+    use nix_bindings_store::store::Store;
 
     use super::*;
     use std::sync::Once;
@@ -267,7 +267,7 @@ mod tests {
         // Only set experimental-features once to minimize the window where
         // concurrent Nix operations might read the setting while it's being modified
         INIT.call_once(|| {
-            nix_util::settings::set("experimental-features", "flakes").unwrap();
+            nix_bindings_util::settings::set("experimental-features", "flakes").unwrap();
         });
     }
 
