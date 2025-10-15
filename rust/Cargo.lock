@@ -264,10 +264,12 @@ name = "nix-bindings-store"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ctor",
  "lazy_static",
  "nix-bindings-bindgen-raw",
  "nix-bindings-util",
  "pkg-config",
+ "tempfile",
 ]
 
 [[package]]

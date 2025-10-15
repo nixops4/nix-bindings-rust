@@ -4,12 +4,13 @@ use nix_bindings_bindgen_raw as raw;
 use nix_bindings_util::context::Context;
 use nix_bindings_util::string_return::{callback_get_result_string, callback_get_result_string_data};
 use nix_bindings_util::{check_call, result_string_init};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ffi::{c_char, CString};
 use std::ptr::null_mut;
 use std::ptr::NonNull;
 use std::sync::{Arc, Mutex, Weak};
 
+use crate::derivation::Derivation;
 use crate::path::StorePath;
 
 /* TODO make Nix itself thread safe */
@@ -66,6 +67,7 @@ lazy_static! {
 }
 
 unsafe extern "C" fn callback_get_result_store_path_set(
+    _context: *mut raw::c_context,
     user_data: *mut std::os::raw::c_void,
     store_path: *const raw::StorePath,
 ) {
@@ -251,6 +253,106 @@ impl Store {
         r
     }
 
+    /// Parse a derivation from JSON.
+    ///
+    /// The JSON format follows the [Nix derivation JSON schema](https://nix.dev/manual/nix/latest/protocols/json/derivation.html).
+    /// Note that this format is experimental as of writing.
+    /// The derivation is not added to the store; use [`Store::add_derivation`] for that.
+    ///
+    /// # Parameters
+    /// - `json`: A JSON string representing the derivation
+    ///
+    /// # Returns
+    /// A [`Derivation`] object if parsing succeeds, or an error if the JSON is invalid
+    /// or malformed.
+    #[doc(alias = "nix_derivation_from_json")]
+    pub fn derivation_from_json(&mut self, json: &str) -> Result<Derivation> {
+        let json_cstr = CString::new(json)?;
+        unsafe {
+            let drv = check_call!(raw::derivation_from_json(
+                &mut self.context,
+                self.inner.ptr(),
+                json_cstr.as_ptr()
+            ))?;
+            let inner = NonNull::new(drv)
+                .ok_or_else(|| Error::msg("derivation_from_json returned null"))?;
+            Ok(Derivation::new_raw(inner))
+        }
+    }
+
+    /// Add a derivation to the store.
+    ///
+    /// This computes the store path for the derivation and registers it in the store.
+    /// The derivation itself is written to the store as a `.drv` file.
+    ///
+    /// # Parameters
+    /// - `drv`: The derivation to add
+    ///
+    /// # Returns
+    /// The store path of the derivation (ending in `.drv`).
+    #[doc(alias = "nix_add_derivation")]
+    pub fn add_derivation(&mut self, drv: &Derivation) -> Result<StorePath> {
+        unsafe {
+            let path = check_call!(raw::add_derivation(
+                &mut self.context,
+                self.inner.ptr(),
+                drv.inner.as_ptr()
+            ))?;
+            let path = NonNull::new(path)
+                .ok_or_else(|| Error::msg("add_derivation returned null"))?;
+            Ok(StorePath::new_raw(path))
+        }
+    }
+
+    /// Build a derivation and return its outputs.
+    ///
+    /// This builds the derivation at the given store path and returns a map of output
+    /// names to their realized store paths. The derivation must already exist in the store
+    /// (see [`Store::add_derivation`]).
+    ///
+    /// # Parameters
+    /// - `path`: The store path of the derivation to build (typically ending in `.drv`)
+    ///
+    /// # Returns
+    /// A [`BTreeMap`] mapping output names (e.g., "out", "dev", "doc") to their store paths.
+    /// The map is ordered alphabetically by output name for deterministic iteration.
+    #[doc(alias = "nix_store_realise")]
+    pub fn realise(&mut self, path: &StorePath) -> Result<BTreeMap<String, StorePath>> {
+        let mut outputs = BTreeMap::new();
+        let userdata = &mut outputs as *mut BTreeMap<String, StorePath> as *mut std::os::raw::c_void;
+
+        unsafe extern "C" fn callback(
+            userdata: *mut std::os::raw::c_void,
+            outname: *const c_char,
+            out_path: *const raw::StorePath,
+        ) {
+            let outputs = userdata as *mut BTreeMap<String, StorePath>;
+            let outputs = &mut *outputs;
+
+            let name = std::ffi::CStr::from_ptr(outname)
+                .to_string_lossy()
+                .into_owned();
+
+            let path = raw::store_path_clone(out_path);
+            let path = NonNull::new(path).expect("store_path_clone returned null");
+            let path = StorePath::new_raw(path);
+
+            outputs.insert(name, path);
+        }
+
+        unsafe {
+            check_call!(raw::store_realise(
+                &mut self.context,
+                self.inner.ptr(),
+                path.as_ptr(),
+                userdata,
+                Some(callback)
+            ))?;
+        }
+
+        Ok(outputs)
+    }
+
     #[doc(alias = "nix_store_get_fs_closure")]
     pub fn get_fs_closure(
         &mut self,
@@ -294,8 +396,31 @@ impl Clone for Store {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use ctor::ctor;
 
     use super::*;
+
+    #[ctor]
+    fn test_setup() {
+        // Initialize settings for tests
+        let _ = INIT.as_ref();
+
+        // Enable ca-derivations for all tests
+        nix_bindings_util::settings::set("experimental-features", "ca-derivations").ok();
+
+        // Disable build hooks to prevent test recursion
+        nix_bindings_util::settings::set("build-hook", "").ok();
+
+        // Set custom build dir for sandbox
+        if cfg!(target_os = "linux") {
+            nix_bindings_util::settings::set("sandbox-build-dir", "/custom-build-dir-for-test").ok();
+        }
+
+        std::env::set_var("_NIX_TEST_NO_SANDBOX", "1");
+
+        // Tests run offline
+        nix_bindings_util::settings::set("substituters", "").ok();
+    }
 
     #[test]
     fn none_works() {
@@ -380,5 +505,337 @@ mod tests {
         };
         assert!(weak.upgrade().is_none());
         assert!(weak.inner.upgrade().is_none());
+    }
+
+    fn create_temp_store() -> (Store, tempfile::TempDir) {
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        let store_dir = temp_dir.path().join("store");
+        let state_dir = temp_dir.path().join("state");
+        let log_dir = temp_dir.path().join("log");
+
+        let store_dir_str = store_dir.to_str().unwrap();
+        let state_dir_str = state_dir.to_str().unwrap();
+        let log_dir_str = log_dir.to_str().unwrap();
+
+        let params = vec![
+            ("store", store_dir_str),
+            ("state", state_dir_str),
+            ("log", log_dir_str),
+        ];
+
+        let store = Store::open(Some("local"), params).unwrap();
+        (store, temp_dir)
+    }
+
+    fn current_system() -> Result<String> {
+        nix_bindings_util::settings::get("system")
+    }
+
+    fn create_test_derivation_json() -> String {
+        let system = current_system().unwrap_or_else(|_| {
+            // Fallback to Rust's platform detection
+            format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
+        });
+        format!(
+            r#"{{
+                "args": ["-c", "echo $name foo > $out"],
+                "builder": "/bin/sh",
+                "env": {{
+                    "builder": "/bin/sh",
+                    "name": "myname",
+                    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+                    "system": "{}"
+                }},
+                "inputDrvs": {{}},
+                "inputSrcs": [],
+                "name": "myname",
+                "outputs": {{
+                    "out": {{
+                    "hashAlgo": "sha256",
+                    "method": "nar"
+                    }}
+                }},
+                "system": "{}",
+                "version": 3
+            }}"#,
+            system, system
+        )
+    }
+
+    #[test]
+    fn derivation_from_json() {
+        let (mut store, temp_dir) = create_temp_store();
+        let drv_json = create_test_derivation_json();
+        let drv = store.derivation_from_json(&drv_json).unwrap();
+        // If we got here, parsing succeeded
+        drop(drv);
+        drop(store);
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn derivation_from_invalid_json() {
+        let (mut store, temp_dir) = create_temp_store();
+        let result = store.derivation_from_json("not valid json");
+        assert!(result.is_err());
+        drop(store);
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn add_derivation() {
+        let (mut store, temp_dir) = create_temp_store();
+        let drv_json = create_test_derivation_json();
+        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv_path = store.add_derivation(&drv).unwrap();
+
+        // Verify we got a .drv path
+        let name = drv_path.name().unwrap();
+        assert!(name.ends_with(".drv"));
+
+        drop(store);
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn realise() {
+        let (mut store, temp_dir) = create_temp_store();
+        let drv_json = create_test_derivation_json();
+        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv_path = store.add_derivation(&drv).unwrap();
+
+        // Build the derivation
+        let outputs = store.realise(&drv_path).unwrap();
+
+        // Verify we got the expected output
+        assert!(outputs.contains_key("out"));
+        let out_path = &outputs["out"];
+        let out_name = out_path.name().unwrap();
+        assert_eq!(out_name, "myname");
+
+        drop(store);
+        drop(temp_dir);
+    }
+
+    fn create_multi_output_derivation_json() -> String {
+        let system = current_system().unwrap_or_else(|_| {
+            format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
+        });
+
+        format!(
+            r#"{{
+                "version": 3,
+                "name": "multi-output-test",
+                "system": "{}",
+                "builder": "/bin/sh",
+                "args": ["-c", "echo a > $outa; echo b > $outb; echo c > $outc; echo d > $outd; echo e > $oute; echo f > $outf; echo g > $outg; echo h > $outh; echo i > $outi; echo j > $outj"],
+                "env": {{
+                    "builder": "/bin/sh",
+                    "name": "multi-output-test",
+                    "system": "{}",
+                    "outf": "/1vkfzqpwk313b51x0xjyh5s7w1lx141mr8da3dr9wqz5aqjyr2fh",
+                    "outd": "/1ypxifgmbzp5sd0pzsp2f19aq68x5215260z3lcrmy5fch567lpm",
+                    "outi": "/1wmasjnqi12j1mkjbxazdd0qd0ky6dh1qry12fk8qyp5kdamhbdx",
+                    "oute": "/1f9r2k1s168js509qlw8a9di1qd14g5lqdj5fcz8z7wbqg11qp1f",
+                    "outh": "/1rkx1hmszslk5nq9g04iyvh1h7bg8p92zw0hi4155hkjm8bpdn95",
+                    "outc": "/1rj4nsf9pjjqq9jsq58a2qkwa7wgvgr09kgmk7mdyli6h1plas4w",
+                    "outb": "/1p7i1dxifh86xq97m5kgb44d7566gj7rfjbw7fk9iij6ca4akx61",
+                    "outg": "/14f8qi0r804vd6a6v40ckylkk1i6yl6fm243qp6asywy0km535lc",
+                    "outj": "/0gkw1366qklqfqb2lw1pikgdqh3cmi3nw6f1z04an44ia863nxaz",
+                    "outa": "/039akv9zfpihrkrv4pl54f3x231x362bll9afblsgfqgvx96h198"
+                }},
+                "inputDrvs": {{}},
+                "inputSrcs": [],
+                "outputs": {{
+                    "outd": {{ "hashAlgo": "sha256", "method": "nar" }},
+                    "outf": {{ "hashAlgo": "sha256", "method": "nar" }},
+                    "outg": {{ "hashAlgo": "sha256", "method": "nar" }},
+                    "outb": {{ "hashAlgo": "sha256", "method": "nar" }},
+                    "outc": {{ "hashAlgo": "sha256", "method": "nar" }},
+                    "outi": {{ "hashAlgo": "sha256", "method": "nar" }},
+                    "outj": {{ "hashAlgo": "sha256", "method": "nar" }},
+                    "outh": {{ "hashAlgo": "sha256", "method": "nar" }},
+                    "outa": {{ "hashAlgo": "sha256", "method": "nar" }},
+                    "oute": {{ "hashAlgo": "sha256", "method": "nar" }}
+                }}
+            }}"#,
+            system, system
+        )
+    }
+
+    #[test]
+    fn realise_multi_output_ordering() {
+        let (mut store, temp_dir) = create_temp_store();
+        let drv_json = create_multi_output_derivation_json();
+        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv_path = store.add_derivation(&drv).unwrap();
+
+        // Build the derivation
+        let outputs = store.realise(&drv_path).unwrap();
+
+        // Verify outputs are complete (BTreeMap guarantees ordering)
+        let output_names: Vec<&String> = outputs.keys().collect();
+        let expected_order = vec!["outa", "outb", "outc", "outd", "oute", "outf", "outg", "outh", "outi", "outj"];
+        assert_eq!(output_names, expected_order);
+
+        drop(store);
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn realise_invalid_system() {
+        let (mut store, temp_dir) = create_temp_store();
+
+        // Create a derivation with an invalid system
+        let system = "bogus65-bogusos";
+        let drv_json = format!(
+            r#"{{
+                "args": ["-c", "echo $name foo > $out"],
+                "builder": "/bin/sh",
+                "env": {{
+                    "builder": "/bin/sh",
+                    "name": "myname",
+                    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+                    "system": "{}"
+                }},
+                "inputDrvs": {{}},
+                "inputSrcs": [],
+                "name": "myname",
+                "outputs": {{
+                    "out": {{
+                    "hashAlgo": "sha256",
+                    "method": "nar"
+                    }}
+                }},
+                "system": "{}",
+                "version": 3
+            }}"#,
+            system, system
+        );
+
+        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv_path = store.add_derivation(&drv).unwrap();
+
+        // Try to build - should fail
+        let result = store.realise(&drv_path);
+        let err = match result {
+            Ok(_) => panic!("Build should fail with invalid system"),
+            Err(e) => e.to_string(),
+        };
+        assert!(
+            err.contains("required system or feature not available"),
+            "Error should mention system not available, got: {}",
+            err
+        );
+
+        drop(store);
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn realise_builder_fails() {
+        let (mut store, temp_dir) = create_temp_store();
+
+        let system = current_system().unwrap_or_else(|_| {
+            format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
+        });
+
+        // Create a derivation where the builder exits with error
+        let drv_json = format!(
+            r#"{{
+                "args": ["-c", "exit 1"],
+                "builder": "/bin/sh",
+                "env": {{
+                    "builder": "/bin/sh",
+                    "name": "failing",
+                    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+                    "system": "{}"
+                }},
+                "inputDrvs": {{}},
+                "inputSrcs": [],
+                "name": "failing",
+                "outputs": {{
+                    "out": {{
+                    "hashAlgo": "sha256",
+                    "method": "nar"
+                    }}
+                }},
+                "system": "{}",
+                "version": 3
+            }}"#,
+            system, system
+        );
+
+        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv_path = store.add_derivation(&drv).unwrap();
+
+        // Try to build - should fail
+        let result = store.realise(&drv_path);
+        let err = match result {
+            Ok(_) => panic!("Build should fail when builder exits with error"),
+            Err(e) => e.to_string(),
+        };
+        assert!(
+            err.contains("builder failed with exit code 1"),
+            "Error should mention builder failed with exit code, got: {}",
+            err
+        );
+
+        drop(store);
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn realise_builder_no_output() {
+        let (mut store, temp_dir) = create_temp_store();
+
+        let system = current_system().unwrap_or_else(|_| {
+            format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
+        });
+
+        // Create a derivation where the builder succeeds but produces no output
+        let drv_json = format!(
+            r#"{{
+                "args": ["-c", "true"],
+                "builder": "/bin/sh",
+                "env": {{
+                    "builder": "/bin/sh",
+                    "name": "no-output",
+                    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+                    "system": "{}"
+                }},
+                "inputDrvs": {{}},
+                "inputSrcs": [],
+                "name": "no-output",
+                "outputs": {{
+                    "out": {{
+                    "hashAlgo": "sha256",
+                    "method": "nar"
+                    }}
+                }},
+                "system": "{}",
+                "version": 3
+            }}"#,
+            system, system
+        );
+
+        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv_path = store.add_derivation(&drv).unwrap();
+
+        // Try to build - should fail
+        let result = store.realise(&drv_path);
+        let err = match result {
+            Ok(_) => panic!("Build should fail when builder produces no output"),
+            Err(e) => e.to_string(),
+        };
+        assert!(
+            err.contains("failed to produce output path"),
+            "Error should mention failed to produce output, got: {}",
+            err
+        );
+
+        drop(store);
+        drop(temp_dir);
     }
 }
