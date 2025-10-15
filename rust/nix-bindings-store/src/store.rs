@@ -353,6 +353,22 @@ impl Store {
         Ok(outputs)
     }
 
+    /// Get the closure of a specific store path.
+    ///
+    /// Computes the filesystem closure (dependency graph) of a store path, with options
+    /// to control the direction and which related paths to include.
+    ///
+    /// # Parameters
+    /// - `store_path`: The path to compute the closure from
+    /// - `flip_direction`: If false, compute the forward closure (paths referenced by this path).
+    ///   If true, compute the backward closure (paths that reference this path).
+    /// - `include_outputs`: When `flip_direction` is false: for any derivation in the closure, include its outputs.
+    ///   When `flip_direction` is true: for any output in the closure, include derivations that produce it.
+    /// - `include_derivers`: When `flip_direction` is false: for any output in the closure, include the derivation that produced it.
+    ///   When `flip_direction` is true: for any derivation in the closure, include its outputs.
+    ///
+    /// # Returns
+    /// A vector of store paths in the closure, in no particular order.
     #[doc(alias = "nix_store_get_fs_closure")]
     pub fn get_fs_closure(
         &mut self,
@@ -834,6 +850,101 @@ mod tests {
             "Error should mention failed to produce output, got: {}",
             err
         );
+
+        drop(store);
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn get_fs_closure_with_outputs() {
+        let (mut store, temp_dir) = create_temp_store();
+        let drv_json = create_test_derivation_json();
+        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv_path = store.add_derivation(&drv).unwrap();
+
+        // Build the derivation to get the output path
+        let outputs = store.realise(&drv_path).unwrap();
+        let out_path = &outputs["out"];
+        let out_path_name = out_path.name().unwrap();
+
+        // Get closure with include_outputs=true
+        let closure = store.get_fs_closure(&drv_path, false, true, false).unwrap();
+
+        // The closure should contain at least the derivation and its output
+        assert!(closure.len() >= 2, "Closure should contain at least drv and output");
+
+        // Verify the output path is in the closure
+        let out_in_closure = closure.iter().any(|p| p.name().unwrap() == out_path_name);
+        assert!(out_in_closure, "Output path should be in closure when include_outputs=true");
+
+        drop(store);
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn get_fs_closure_without_outputs() {
+        let (mut store, temp_dir) = create_temp_store();
+        let drv_json = create_test_derivation_json();
+        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv_path = store.add_derivation(&drv).unwrap();
+
+        // Build the derivation to get the output path
+        let outputs = store.realise(&drv_path).unwrap();
+        let out_path = &outputs["out"];
+        let out_path_name = out_path.name().unwrap();
+
+        // Get closure with include_outputs=false
+        let closure = store.get_fs_closure(&drv_path, false, false, false).unwrap();
+
+        // Verify the output path is NOT in the closure
+        let out_in_closure = closure.iter().any(|p| p.name().unwrap() == out_path_name);
+        assert!(!out_in_closure, "Output path should not be in closure when include_outputs=false");
+
+        drop(store);
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn get_fs_closure_flip_direction() {
+        let (mut store, temp_dir) = create_temp_store();
+        let drv_json = create_test_derivation_json();
+        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv_path = store.add_derivation(&drv).unwrap();
+
+        // Build the derivation to get the output path
+        let outputs = store.realise(&drv_path).unwrap();
+        let out_path = &outputs["out"];
+        let out_path_name = out_path.name().unwrap();
+
+        // Get closure with flip_direction=true (reverse dependencies)
+        let closure = store.get_fs_closure(&drv_path, true, true, false).unwrap();
+
+        // Verify the output path is NOT in the closure when direction is flipped
+        let out_in_closure = closure.iter().any(|p| p.name().unwrap() == out_path_name);
+        assert!(!out_in_closure, "Output path should not be in closure when flip_direction=true");
+
+        drop(store);
+        drop(temp_dir);
+    }
+
+    #[test]
+    fn get_fs_closure_include_derivers() {
+        let (mut store, temp_dir) = create_temp_store();
+        let drv_json = create_test_derivation_json();
+        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv_path = store.add_derivation(&drv).unwrap();
+        let drv_path_name = drv_path.name().unwrap();
+
+        // Build the derivation to get the output path
+        let outputs = store.realise(&drv_path).unwrap();
+        let out_path = &outputs["out"];
+
+        // Get closure of the output path with include_derivers=true
+        let closure = store.get_fs_closure(out_path, false, false, true).unwrap();
+
+        // Verify the derivation path is in the closure
+        let drv_in_closure = closure.iter().any(|p| p.name().unwrap() == drv_path_name);
+        assert!(drv_in_closure, "Derivation should be in closure when include_derivers=true");
 
         drop(store);
         drop(temp_dir);
