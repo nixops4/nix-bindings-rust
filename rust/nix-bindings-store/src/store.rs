@@ -4,12 +4,15 @@ use nix_bindings_bindgen_raw as raw;
 use nix_bindings_util::context::Context;
 use nix_bindings_util::string_return::{callback_get_result_string, callback_get_result_string_data};
 use nix_bindings_util::{check_call, result_string_init};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
+#[cfg(nix_at_least = "2.33")]
+use std::collections::BTreeMap;
 use std::ffi::{c_char, CString};
 use std::ptr::null_mut;
 use std::ptr::NonNull;
 use std::sync::{Arc, Mutex, Weak};
 
+#[cfg(nix_at_least = "2.33")]
 use crate::derivation::Derivation;
 use crate::path::StorePath;
 
@@ -66,6 +69,7 @@ lazy_static! {
     static ref STORE_CACHE: Arc<Mutex<StoreCacheMap>> = Arc::new(Mutex::new(HashMap::new()));
 }
 
+#[cfg(nix_at_least = "2.33")]
 unsafe extern "C" fn callback_get_result_store_path_set(
     _context: *mut raw::c_context,
     user_data: *mut std::os::raw::c_void,
@@ -82,6 +86,7 @@ unsafe extern "C" fn callback_get_result_store_path_set(
     ret.push(store_path);
 }
 
+#[cfg(nix_at_least = "2.33")]
 fn callback_get_result_store_path_set_data(vec: &mut Vec<StorePath>) -> *mut std::os::raw::c_void {
     vec as *mut Vec<StorePath> as *mut std::os::raw::c_void
 }
@@ -255,6 +260,8 @@ impl Store {
 
     /// Parse a derivation from JSON.
     ///
+    /// **Requires Nix 2.33 or later.**
+    ///
     /// The JSON format follows the [Nix derivation JSON schema](https://nix.dev/manual/nix/latest/protocols/json/derivation.html).
     /// Note that this format is experimental as of writing.
     /// The derivation is not added to the store; use [`Store::add_derivation`] for that.
@@ -265,6 +272,7 @@ impl Store {
     /// # Returns
     /// A [`Derivation`] object if parsing succeeds, or an error if the JSON is invalid
     /// or malformed.
+    #[cfg(nix_at_least = "2.33")]
     #[doc(alias = "nix_derivation_from_json")]
     pub fn derivation_from_json(&mut self, json: &str) -> Result<Derivation> {
         let json_cstr = CString::new(json)?;
@@ -282,6 +290,8 @@ impl Store {
 
     /// Add a derivation to the store.
     ///
+    /// **Requires Nix 2.33 or later.**
+    ///
     /// This computes the store path for the derivation and registers it in the store.
     /// The derivation itself is written to the store as a `.drv` file.
     ///
@@ -290,6 +300,7 @@ impl Store {
     ///
     /// # Returns
     /// The store path of the derivation (ending in `.drv`).
+    #[cfg(nix_at_least = "2.33")]
     #[doc(alias = "nix_add_derivation")]
     pub fn add_derivation(&mut self, drv: &Derivation) -> Result<StorePath> {
         unsafe {
@@ -306,6 +317,8 @@ impl Store {
 
     /// Build a derivation and return its outputs.
     ///
+    /// **Requires Nix 2.33 or later.**
+    ///
     /// This builds the derivation at the given store path and returns a map of output
     /// names to their realized store paths. The derivation must already exist in the store
     /// (see [`Store::add_derivation`]).
@@ -316,6 +329,7 @@ impl Store {
     /// # Returns
     /// A [`BTreeMap`] mapping output names (e.g., "out", "dev", "doc") to their store paths.
     /// The map is ordered alphabetically by output name for deterministic iteration.
+    #[cfg(nix_at_least = "2.33")]
     #[doc(alias = "nix_store_realise")]
     pub fn realise(&mut self, path: &StorePath) -> Result<BTreeMap<String, StorePath>> {
         let mut outputs = BTreeMap::new();
@@ -355,6 +369,8 @@ impl Store {
 
     /// Get the closure of a specific store path.
     ///
+    /// **Requires Nix 2.33 or later.**
+    ///
     /// Computes the filesystem closure (dependency graph) of a store path, with options
     /// to control the direction and which related paths to include.
     ///
@@ -369,6 +385,7 @@ impl Store {
     ///
     /// # Returns
     /// A vector of store paths in the closure, in no particular order.
+    #[cfg(nix_at_least = "2.33")]
     #[doc(alias = "nix_store_get_fs_closure")]
     pub fn get_fs_closure(
         &mut self,
@@ -548,6 +565,7 @@ mod tests {
         nix_bindings_util::settings::get("system")
     }
 
+    #[cfg(nix_at_least = "2.33")]
     fn create_test_derivation_json() -> String {
         let system = current_system().unwrap_or_else(|_| {
             // Fallback to Rust's platform detection
@@ -580,6 +598,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn derivation_from_json() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
@@ -591,6 +610,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn derivation_from_invalid_json() {
         let (mut store, temp_dir) = create_temp_store();
         let result = store.derivation_from_json("not valid json");
@@ -600,6 +620,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn add_derivation() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
@@ -615,6 +636,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn realise() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
@@ -634,6 +656,7 @@ mod tests {
         drop(temp_dir);
     }
 
+    #[cfg(nix_at_least = "2.33")]
     fn create_multi_output_derivation_json() -> String {
         let system = current_system().unwrap_or_else(|_| {
             format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
@@ -681,6 +704,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn realise_multi_output_ordering() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_multi_output_derivation_json();
@@ -700,6 +724,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn realise_invalid_system() {
         let (mut store, temp_dir) = create_temp_store();
 
@@ -750,6 +775,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn realise_builder_fails() {
         let (mut store, temp_dir) = create_temp_store();
 
@@ -803,6 +829,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn realise_builder_no_output() {
         let (mut store, temp_dir) = create_temp_store();
 
@@ -856,6 +883,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn get_fs_closure_with_outputs() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
@@ -882,6 +910,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn get_fs_closure_without_outputs() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
@@ -905,6 +934,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn get_fs_closure_flip_direction() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
@@ -928,6 +958,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.33")]
     fn get_fs_closure_include_derivers() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
