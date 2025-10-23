@@ -56,6 +56,10 @@
 
               echo "Configuring relocated store at $NIX_REMOTE..."
 
+              # Create nix.conf with experimental features enabled
+              mkdir -p "$NIX_CONF_DIR"
+              echo "experimental-features = ca-derivations flakes" > "$NIX_CONF_DIR/nix.conf"
+
               # Init ahead of time, because concurrent initialization is flaky
               ${
                 # Not using nativeBuildInputs because this should (hopefully) be
