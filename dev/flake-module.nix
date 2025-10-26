@@ -16,7 +16,7 @@
       pre-commit.settings.hooks.nixfmt-rfc-style.enable = true;
       # Temporarily disable rustfmt due to configuration issues
       # pre-commit.settings.hooks.rustfmt.enable = true;
-      pre-commit.settings.settings.rust.cargoManifestPath = "./rust/Cargo.toml";
+      pre-commit.settings.settings.rust.cargoManifestPath = "./Cargo.toml";
 
       # Check that we're using ///-style doc comments in Rust code.
       #
@@ -78,7 +78,7 @@
         ];
         shellHook = ''
           ${config.pre-commit.installationScript}
-          source ${../rust/bindgen-gcc.sh}
+          source ${../bindgen-gcc.sh}
           echo 1>&2 "Welcome to the development shell!"
         '';
         # rust-analyzer needs a NIX_PATH for some reason
