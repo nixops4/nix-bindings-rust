@@ -21,7 +21,7 @@
         imports = [
           inputs.nix-cargo-integration.flakeModule
           inputs.flake-parts.flakeModules.partitions
-          ./rust/nci.nix
+          ./nci.nix
         ];
         systems = [
           "x86_64-linux"

@@ -3,9 +3,9 @@
 
 If `cargo-valgrind` is broken, you may run `valgrind` manually.
 
-1. `cd rust; cargo test -v`
+1. `cargo test -v`
 2. find the relevant test suite executable in the log
-    - example: `/home/user/src/nix-bindings-rust/rust/target/debug/deps/nix_util-036ec381a9e3fd6d`
+    - example: `/home/user/src/nix-bindings-rust/target/debug/deps/nix_util-036ec381a9e3fd6d`
 3. `valgrind --leak-check=full <paste the test exe>`
 4. check that
     - `definitely lost: 0 bytes in 0 blocks`
