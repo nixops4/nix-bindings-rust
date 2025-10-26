@@ -267,6 +267,7 @@ mod tests {
         // Only set experimental-features once to minimize the window where
         // concurrent Nix operations might read the setting while it's being modified
         INIT.call_once(|| {
+            nix_bindings_expr::eval_state::init().unwrap();
             nix_bindings_util::settings::set("experimental-features", "flakes").unwrap();
         });
     }
@@ -299,6 +300,7 @@ mod tests {
         init();
         let gc_registration = gc_register_my_thread();
         let store = Store::open(None, []).unwrap();
+        let fetchers_settings = FetchersSettings::new().unwrap();
         let flake_settings = FlakeSettings::new().unwrap();
         let mut eval_state = EvalStateBuilder::new(store)
             .unwrap()
@@ -326,7 +328,7 @@ mod tests {
         let flake_lock_flags = FlakeLockFlags::new(&flake_settings).unwrap();
 
         let (flake_ref, fragment) = FlakeReference::parse_with_fragment(
-            &FetchersSettings::new().unwrap(),
+            &fetchers_settings,
             &flake_settings,
             &FlakeReferenceParseFlags::new(&flake_settings).unwrap(),
             &format!("path:{}#subthing", tmp_dir.path().display()),
@@ -336,7 +338,7 @@ mod tests {
         assert_eq!(fragment, "subthing");
 
         let locked_flake = LockedFlake::lock(
-            &FetchersSettings::new().unwrap(),
+            &fetchers_settings,
             &flake_settings,
             &eval_state,
             &flake_lock_flags,
@@ -353,6 +355,7 @@ mod tests {
 
         assert_eq!(hello, "potato");
 
+        drop(fetchers_settings);
         drop(tmp_dir);
         drop(gc_registration);
     }
@@ -362,6 +365,7 @@ mod tests {
         init();
         let gc_registration = gc_register_my_thread();
         let store = Store::open(None, []).unwrap();
+        let fetchers_settings = FetchersSettings::new().unwrap();
         let flake_settings = FlakeSettings::new().unwrap();
         let mut eval_state = EvalStateBuilder::new(store)
             .unwrap()
@@ -382,6 +386,8 @@ mod tests {
 
         let flake_dir_a_str = flake_dir_a.to_str().unwrap();
         let flake_dir_c_str = flake_dir_c.to_str().unwrap();
+        assert!(!flake_dir_a_str.is_empty());
+        assert!(!flake_dir_c_str.is_empty());
 
         // a
         std::fs::write(
@@ -434,7 +440,7 @@ mod tests {
             .unwrap();
 
         let (flake_ref_a, fragment) = FlakeReference::parse_with_fragment(
-            &FetchersSettings::new().unwrap(),
+            &fetchers_settings,
             &flake_settings,
             &flake_reference_parse_flags,
             &format!("path:{}", &flake_dir_a_str),
@@ -448,7 +454,7 @@ mod tests {
         flake_lock_flags.set_mode_check().unwrap();
 
         let locked_flake = LockedFlake::lock(
-            &FetchersSettings::new().unwrap(),
+            &fetchers_settings,
             &flake_settings,
             &eval_state,
             &flake_lock_flags,
@@ -465,7 +471,7 @@ mod tests {
         flake_lock_flags.set_mode_virtual().unwrap();
 
         let locked_flake = LockedFlake::lock(
-            &FetchersSettings::new().unwrap(),
+            &fetchers_settings,
             &flake_settings,
             &eval_state,
             &flake_lock_flags,
@@ -487,7 +493,7 @@ mod tests {
         flake_lock_flags.set_mode_check().unwrap();
 
         let locked_flake = LockedFlake::lock(
-            &FetchersSettings::new().unwrap(),
+            &fetchers_settings,
             &flake_settings,
             &eval_state,
             &flake_lock_flags,
@@ -507,7 +513,7 @@ mod tests {
         flake_lock_flags.set_mode_write_as_needed().unwrap();
 
         let locked_flake = LockedFlake::lock(
-            &FetchersSettings::new().unwrap(),
+            &fetchers_settings,
             &flake_settings,
             &eval_state,
             &flake_lock_flags,
@@ -527,7 +533,7 @@ mod tests {
         flake_lock_flags.set_mode_check().unwrap();
 
         let locked_flake = LockedFlake::lock(
-            &FetchersSettings::new().unwrap(),
+            &fetchers_settings,
             &flake_settings,
             &eval_state,
             &flake_lock_flags,
@@ -548,7 +554,7 @@ mod tests {
         flake_lock_flags.set_mode_write_as_needed().unwrap();
 
         let (flake_ref_c, fragment) = FlakeReference::parse_with_fragment(
-            &FetchersSettings::new().unwrap(),
+            &fetchers_settings,
             &flake_settings,
             &flake_reference_parse_flags,
             &format!("path:{}", &flake_dir_c_str),
@@ -561,7 +567,7 @@ mod tests {
             .unwrap();
 
         let locked_flake = LockedFlake::lock(
-            &FetchersSettings::new().unwrap(),
+            &fetchers_settings,
             &flake_settings,
             &eval_state,
             &flake_lock_flags,
@@ -584,7 +590,7 @@ mod tests {
         flake_lock_flags.set_mode_check().unwrap();
 
         let locked_flake = LockedFlake::lock(
-            &FetchersSettings::new().unwrap(),
+            &fetchers_settings,
             &flake_settings,
             &eval_state,
             &flake_lock_flags,
@@ -599,6 +605,7 @@ mod tests {
         let hello = eval_state.require_string(&hello).unwrap();
         assert_eq!(hello, "BOB");
 
+        drop(fetchers_settings);
         drop(tmp_dir);
         drop(gc_registration);
     }
