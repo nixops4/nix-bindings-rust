@@ -6,7 +6,7 @@ fn main() {
     // Unfortunately, Rust doesn't give us a "greater than" operator in conditional
     // compilation, so we pre-evaluate the version comparisons here, making use
     // of the multi-valued nature of Rust cfgs.
-    let relevant_versions = vec!["2.26"];
+    let relevant_versions = vec!["2.26", "2.33"];
     let versions = relevant_versions
         .iter()
         .map(|v| format!("\"{}\"", v))
