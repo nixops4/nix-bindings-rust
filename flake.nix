@@ -30,6 +30,7 @@
             ...
           }:
           {
+            _file = ./flake.nix;
             options.perSystem = flake-parts-lib.mkPerSystemOption (
               { config, pkgs, ... }:
               let
@@ -115,6 +116,7 @@
           # Consumer toplevel
           { options, config, ... }:
           {
+            _file = ./flake.nix;
             imports = [ flake-parts-modules.basic ];
             config.perSystem =
               # Consumer perSystem
