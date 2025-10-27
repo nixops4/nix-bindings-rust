@@ -10,8 +10,14 @@
     inputs.hercules-ci-effects.flakeModule
   ];
   perSystem =
-    { config, pkgs, ... }:
     {
+      config,
+      pkgs,
+      inputs',
+      ...
+    }:
+    {
+      nix-bindings-rust.nixPackage = inputs'.nix.packages.default;
 
       pre-commit.settings.hooks.nixfmt-rfc-style.enable = true;
       # Temporarily disable rustfmt due to configuration issues
