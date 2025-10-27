@@ -1,7 +1,5 @@
 {
-  lib,
   inputs,
-  withSystem,
   ...
 }:
 {
@@ -92,7 +90,7 @@
       };
     };
   herculesCI =
-    hci@{ config, ... }:
+    { config, ... }:
     {
       ciSystems = [ "x86_64-linux" ];
     };
