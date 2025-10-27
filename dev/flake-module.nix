@@ -1,7 +1,5 @@
 {
-  lib,
   inputs,
-  withSystem,
   ...
 }:
 {
@@ -10,8 +8,14 @@
     inputs.hercules-ci-effects.flakeModule
   ];
   perSystem =
-    { config, pkgs, ... }:
     {
+      config,
+      pkgs,
+      inputs',
+      ...
+    }:
+    {
+      nix-bindings-rust.nixPackage = inputs'.nix.packages.default;
 
       pre-commit.settings.hooks.nixfmt-rfc-style.enable = true;
       # Temporarily disable rustfmt due to configuration issues
@@ -86,7 +90,7 @@
       };
     };
   herculesCI =
-    hci@{ config, ... }:
+    { config, ... }:
     {
       ciSystems = [ "x86_64-linux" ];
     };
