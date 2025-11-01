@@ -123,4 +123,6 @@ impl Clone for Value {
     }
 }
 
+unsafe impl Send for Value { }
+
 // Tested in eval_state.rs
