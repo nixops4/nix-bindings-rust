@@ -60,7 +60,7 @@
                 };
                 config.nix-bindings-rust = {
                   nciBuildConfig = {
-                    mkDerivation = {
+                    mkDerivation = rec {
                       buildInputs = [
                         # stdbool.h
                         pkgs.stdenv.cc
@@ -88,6 +88,7 @@
                       postConfigure = lib.optionalString pkgs.stdenv.cc.isGNU ''
                         source ${./bindgen-gcc.sh}
                       '';
+                      shellHook = postConfigure;
                     };
                     # NOTE: duplicated in flake.nix devShell
                     env = {
