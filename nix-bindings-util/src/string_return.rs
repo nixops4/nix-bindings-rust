@@ -75,7 +75,7 @@ mod tests {
     #[test]
     fn test_callback_result_string() {
         let mut ret: Result<String> = result_string_init!();
-        let start: *const std::os::raw::c_char = b"helloGARBAGE".as_ptr() as *const i8;
+        let start = b"helloGARBAGE".as_ptr() as *const std::os::raw::c_char;
         let n: std::os::raw::c_uint = 5;
         let user_data: *mut std::os::raw::c_void = callback_get_result_string_data(&mut ret);
         unsafe {
