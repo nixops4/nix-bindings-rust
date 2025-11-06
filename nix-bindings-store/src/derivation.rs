@@ -1,4 +1,4 @@
-#![cfg(nix_at_least = "2.33")]
+#![cfg(nix_at_least = "2.31")]
 
 use nix_bindings_bindgen_raw as raw;
 use std::ptr::NonNull;
