@@ -144,7 +144,7 @@ mod tests {
             raw::set_err_msg(
                 ctx_ptr,
                 raw::err_NIX_ERR_UNKNOWN.try_into().unwrap(),
-                b"dummy error message\0".as_ptr() as *const i8,
+                b"dummy error message\0".as_ptr() as *const std::os::raw::c_char,
             );
         }
     }
