@@ -7,7 +7,7 @@ use nix_bindings_util::{check_call, result_string_init};
 use std::collections::HashMap;
 #[cfg(nix_at_least = "2.31")]
 use std::collections::BTreeMap;
-use std::ffi::{c_char, CString};
+use std::ffi::{c_char, CStr, CString};
 use std::ptr::null_mut;
 use std::ptr::NonNull;
 use std::sync::{Arc, Mutex, Weak};
@@ -89,6 +89,51 @@ unsafe extern "C" fn callback_get_result_store_path_set(
 #[cfg(nix_at_least = "2.31")]
 fn callback_get_result_store_path_set_data(vec: &mut Vec<StorePath>) -> *mut std::os::raw::c_void {
     vec as *mut Vec<StorePath> as *mut std::os::raw::c_void
+}
+
+unsafe extern "C" fn callback_get_result_derivation(
+    user_data: *mut std::os::raw::c_void,
+    drv: *const raw::derivation,
+) {
+    let ret = user_data as *mut Result<Derivation>;
+
+    let drv = raw::derivation_clone(drv);
+
+    let drv = NonNull::new(drv).expect("nix_store_drv_from_path returned a null pointer");
+    let drv = Derivation::new_raw(drv);
+
+    if (*ret).is_ok() {
+        panic!(
+            "callback_get_result_derivation: Result must be initialized to Err. Did Nix call us twice?"
+        );
+    }
+
+    *ret = Ok(drv);
+}
+
+fn callback_get_result_derivation_data(vec: &mut Result<Derivation>) -> *mut std::os::raw::c_void {
+    vec as *mut Result<Derivation> as *mut std::os::raw::c_void
+}
+
+unsafe extern "C" fn callback_make_drv_outputs(
+    user_data: *mut std::os::raw::c_void,
+    output_name: *const std::os::raw::c_char,
+    path: *const std::os::raw::c_char,
+) {
+    let ret = user_data as *mut HashMap<String, String>;
+    let ret: &mut HashMap<String, String> = &mut *ret;
+
+    let output_name = CStr::from_ptr(output_name);
+    let path = CStr::from_ptr(path);
+
+    ret.insert(
+        output_name.to_str().unwrap().to_string(),
+        path.to_str().unwrap().to_string(),
+    );
+}
+
+fn callback_make_drv_outputs_data(vec: &mut HashMap<String, String>) -> *mut std::os::raw::c_void {
+    vec as *mut HashMap<String, String> as *mut std::os::raw::c_void
 }
 
 pub struct Store {
@@ -315,6 +360,22 @@ impl Store {
         }
     }
 
+    #[doc(alias = "nix_derivation_make_outputs")]
+    pub fn make_drv_outputs(&mut self, json: &str) -> Result<HashMap<String, String>> {
+        let json = CString::new(json)?;
+        let mut r = HashMap::new();
+        unsafe {
+            check_call!(raw::derivation_make_outputs(
+                &mut self.context,
+                self.inner.ptr(),
+                json.as_ptr(),
+                Some(callback_make_drv_outputs),
+                callback_make_drv_outputs_data(&mut r)
+            ))
+        }?;
+        Ok(r)
+    }
+
     /// Build a derivation and return its outputs.
     ///
     /// **Requires Nix 2.33 or later.**
@@ -408,6 +469,36 @@ impl Store {
             ))
         }?;
         Ok(r)
+    }
+
+    #[doc(alias = "nix_store_drv_from_path")]
+    pub fn drv_from_path(&mut self, path: &StorePath) -> Result<Derivation> {
+        let mut r = Err(anyhow::anyhow!("Derivation was not set by Nix C API"));
+        unsafe {
+            check_call!(raw::store_drv_from_path(
+                &mut self.context,
+                self.inner.ptr(),
+                path.as_ptr(),
+                Some(callback_get_result_derivation),
+                callback_get_result_derivation_data(&mut r)
+            ))
+        }?;
+        r
+    }
+
+    #[doc(alias = "nix_store_query_path_info")]
+    pub fn query_path_info(&mut self, path: &StorePath) -> Result<String> {
+        let mut r = result_string_init!();
+        unsafe {
+            check_call!(raw::store_query_path_info(
+                &mut self.context,
+                self.inner.ptr(),
+                path.as_ptr(),
+                callback_get_result_string_data(&mut r),
+                Some(callback_get_result_string)
+            ))
+        }?;
+        r
     }
 
     pub fn weak_ref(&self) -> StoreWeak {
