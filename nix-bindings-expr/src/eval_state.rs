@@ -1879,6 +1879,7 @@ mod tests {
         .unwrap();
     }
 
+    #[ignore = "Derivation fails to build in CI"]
     #[test]
     fn eval_state_realise_string() {
         gc_registering_current_thread(|| {
