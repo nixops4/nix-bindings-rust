@@ -815,7 +815,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(nix_at_least = "2.31")]
+    #[cfg(nix_at_least = "2.33")]
     fn realise_invalid_system() {
         let (mut store, temp_dir) = create_temp_store();
 
@@ -866,7 +866,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(nix_at_least = "2.31")]
+    #[cfg(nix_at_least = "2.33")]
     fn realise_builder_fails() {
         let (mut store, temp_dir) = create_temp_store();
 
@@ -920,7 +920,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(nix_at_least = "2.31")]
+    #[cfg(nix_at_least = "2.33")]
     fn realise_builder_no_output() {
         let (mut store, temp_dir) = create_temp_store();
 
