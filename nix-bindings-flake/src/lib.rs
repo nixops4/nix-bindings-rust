@@ -251,6 +251,24 @@ impl LockedFlake {
             Ok(nix_bindings_expr::value::__private::raw_value_new(r))
         }
     }
+
+    /// Reads a file out of the Flake
+    pub fn read_path(&self, path: &str) -> Result<String> {
+        let mut ctx = Context::new();
+        let mut r = result_string_init!();
+        unsafe {
+            context::check_call!(raw::locked_flake_read_path(
+                &mut ctx,
+                self.ptr.as_ptr(),
+                CString::new(path)
+                    .context("Failed to create CString for path")?
+                    .as_ptr(),
+                Some(callback_get_result_string),
+                callback_get_result_string_data(&mut r)
+            ))
+        }?;
+        r
+    }
 }
 
 #[cfg(test)]
