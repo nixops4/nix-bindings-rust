@@ -431,7 +431,7 @@ impl Clone for Store {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use ctor::ctor;
     use std::collections::HashMap;
 
@@ -572,7 +572,7 @@ mod tests {
     }
 
     #[cfg(nix_at_least = "2.33")]
-    fn create_test_derivation_json() -> String {
+    pub(crate) fn create_test_derivation_json() -> String {
         let system = current_system().unwrap_or_else(|_| {
             // Fallback to Rust's platform detection
             format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)

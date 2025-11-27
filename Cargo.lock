@@ -647,6 +647,7 @@ dependencies = [
  "nix-bindings-util",
  "nix-bindings-util-sys",
  "pkg-config",
+ "serde_json",
  "tempfile",
  "zerocopy",
 ]
@@ -661,6 +662,7 @@ dependencies = [
  "nix-bindings-store",
  "nix-bindings-util",
  "pkg-config",
+ "serde_json",
  "tempfile",
 ]
 
