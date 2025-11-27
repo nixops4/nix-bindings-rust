@@ -1,0 +1,25 @@
+[package]
+name = "nix-bindings-store-harmonia"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+license = "LGPL-2.1"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1.0"
+nix-bindings-store = { path = "../nix-bindings-store" }
+harmonia-store-core = { git = "https://github.com/nix-community/harmonia.git" }
+
+[dev-dependencies]
+ctor = "0.2"
+tempfile = "3.10"
+
+[build-dependencies]
+pkg-config = "0.3"
+nix-bindings-util = { path = "../nix-bindings-util" }
+
+[lints]
+workspace = true
