@@ -64,6 +64,13 @@ impl StorePath {
         self.raw.as_ptr()
     }
 }
+
+impl Clone for StorePath {
+    fn clone(&self) -> Self {
+        unsafe { Self::new_raw_clone(self.raw) }
+    }
+}
+
 impl Drop for StorePath {
     fn drop(&mut self) {
         unsafe {
