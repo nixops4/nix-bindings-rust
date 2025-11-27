@@ -639,8 +639,10 @@ version = "0.2.1"
 dependencies = [
  "anyhow",
  "ctor",
+ "harmonia-store-core",
  "hex-literal",
  "lazy_static",
+ "nix-bindings-store-harmonia",
  "nix-bindings-store-sys",
  "nix-bindings-util",
  "nix-bindings-util-sys",

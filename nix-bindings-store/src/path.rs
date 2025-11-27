@@ -1,6 +1,8 @@
 use std::ptr::NonNull;
 
-use anyhow::{Context as _, Result};
+use anyhow::Result;
+#[cfg(nix_at_least = "2.33")]
+use anyhow::Context as AnyhowContext;
 use nix_bindings_store_sys as raw;
 #[cfg(nix_at_least = "2.33")]
 use nix_bindings_util::{check_call, context::Context};
@@ -153,5 +155,23 @@ mod tests {
         // Round trip gets back what we started with
         assert_eq!(store_path.hash().unwrap(), original_hash);
         assert_eq!(store_path.name().unwrap(), original_name);
+    }
+
+    #[test]
+    #[cfg(nix_at_least = "2.33")]
+    fn store_path_clone() {
+        use super::StorePath;
+        // Import TryFrom impls from the harmonia integration crate
+        use nix_bindings_store_harmonia as _;
+
+        let harmonia_path: harmonia_store_core::store_path::StorePath =
+            "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv".parse().unwrap();
+
+        let nix_path: StorePath = (&harmonia_path).try_into().unwrap();
+        let cloned_path = nix_path.clone();
+
+        // Verify both paths have the same name and hash
+        assert_eq!(nix_path.name().unwrap(), cloned_path.name().unwrap());
+        assert_eq!(nix_path.hash().unwrap(), cloned_path.hash().unwrap());
     }
 }
