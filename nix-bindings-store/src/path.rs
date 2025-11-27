@@ -10,6 +10,7 @@ use nix_bindings_util::{
 pub struct StorePath {
     raw: NonNull<raw::StorePath>,
 }
+
 impl StorePath {
     /// Get the name of the store path.
     ///
