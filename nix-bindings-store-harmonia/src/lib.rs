@@ -127,37 +127,35 @@ mod tests {
 
     #[cfg(nix_at_least = "2.33")]
     fn create_test_derivation() -> harmonia_store_core::derivation::Derivation {
-        use harmonia_store_core::derivation::{self, Derivation, Output};
-        use std::collections::BTreeMap;
+        use bytes::Bytes;
+        use harmonia_store_core::derivation::{Derivation, DerivationOutput};
+        use harmonia_store_core::derived_path::OutputName;
+        use std::collections::{BTreeMap, BTreeSet};
 
-        let system = format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS);
+        let platform = format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS);
         let out_path = "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9";
 
         let mut env = BTreeMap::new();
-        env.insert("builder".to_string(), "/bin/sh".to_string());
-        env.insert("name".to_string(), "myname".to_string());
-        env.insert("out".to_string(), out_path.to_string());
-        env.insert("system".to_string(), system.clone());
+        env.insert(Bytes::from("builder"), Bytes::from("/bin/sh"));
+        env.insert(Bytes::from("name"), Bytes::from("myname"));
+        env.insert(Bytes::from("out"), Bytes::from(out_path));
+        env.insert(Bytes::from("system"), Bytes::from(platform.clone()));
 
         let mut outputs = BTreeMap::new();
         outputs.insert(
-            "out".to_string(),
-            Output::InputAddressed(derivation::InputAddressed {
-                path: out_path.to_string(),
-            }),
+            "out".parse::<OutputName>().unwrap(),
+            DerivationOutput::InputAddressed(out_path.parse().unwrap()),
         );
 
         Derivation {
-            args: vec!["-c".to_string(), "echo $name foo > $out".to_string()],
-            builder: "/bin/sh".to_string(),
+            args: vec![Bytes::from("-c"), Bytes::from("echo $name foo > $out")],
+            builder: Bytes::from("/bin/sh"),
             env,
-            inputs: derivation::Inputs {
-                drvs: BTreeMap::new(),
-                srcs: vec![],
-            },
-            name: "myname".to_string(),
+            inputs: BTreeSet::new(),
+            name: "myname".parse().unwrap(),
             outputs,
-            system,
+            platform: Bytes::from(platform),
+            structured_attrs: None,
         }
     }
 

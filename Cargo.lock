@@ -640,6 +640,7 @@ dependencies = [
  "anyhow",
  "ctor",
  "harmonia-store-core",
+ "harmonia-utils-hash",
  "hex-literal",
  "lazy_static",
  "nix-bindings-store-harmonia",
@@ -657,6 +658,7 @@ name = "nix-bindings-store-harmonia"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "ctor",
  "harmonia-store-core",
  "nix-bindings-store",
