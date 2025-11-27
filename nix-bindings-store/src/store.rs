@@ -433,8 +433,18 @@ impl Clone for Store {
 #[cfg(test)]
 pub(crate) mod tests {
     use ctor::ctor;
-
     use std::collections::HashMap;
+
+    #[cfg(nix_at_least = "2.33")]
+    use harmonia_store_core::derivation::DerivationOutput;
+    #[cfg(nix_at_least = "2.33")]
+    use harmonia_store_core::placeholder::Placeholder;
+    #[cfg(nix_at_least = "2.33")]
+    use harmonia_store_core::store_path::ContentAddressMethodAlgorithm;
+    #[cfg(nix_at_least = "2.33")]
+    use harmonia_utils_hash::Algorithm;
+    #[cfg(nix_at_least = "2.33")]
+    use std::collections::{BTreeMap, BTreeSet};
 
     use super::*;
 
@@ -587,7 +597,11 @@ pub(crate) mod tests {
                 ("name".into(), "myname".into()),
                 (
                     "out".into(),
-                    "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9".into(),
+                    Placeholder::standard_output(&"out".parse().unwrap())
+                        .render()
+                        .to_string_lossy()
+                        .to_string()
+                        .into(),
                 ),
                 ("system".into(), system.clone().into()),
             ]),
@@ -675,16 +689,16 @@ pub(crate) mod tests {
                 ("builder".into(), "/bin/sh".into()),
                 ("name".into(), "multi-output-test".into()),
                 ("system".into(), system.clone().into()),
-                ("outa".into(), "/039akv9zfpihrkrv4pl54f3x231x362bll9afblsgfqgvx96h198".into()),
-                ("outb".into(), "/1p7i1dxifh86xq97m5kgb44d7566gj7rfjbw7fk9iij6ca4akx61".into()),
-                ("outc".into(), "/1rj4nsf9pjjqq9jsq58a2qkwa7wgvgr09kgmk7mdyli6h1plas4w".into()),
-                ("outd".into(), "/1ypxifgmbzp5sd0pzsp2f19aq68x5215260z3lcrmy5fch567lpm".into()),
-                ("oute".into(), "/1f9r2k1s168js509qlw8a9di1qd14g5lqdj5fcz8z7wbqg11qp1f".into()),
-                ("outf".into(), "/1vkfzqpwk313b51x0xjyh5s7w1lx141mr8da3dr9wqz5aqjyr2fh".into()),
-                ("outg".into(), "/14f8qi0r804vd6a6v40ckylkk1i6yl6fm243qp6asywy0km535lc".into()),
-                ("outh".into(), "/1rkx1hmszslk5nq9g04iyvh1h7bg8p92zw0hi4155hkjm8bpdn95".into()),
-                ("outi".into(), "/1wmasjnqi12j1mkjbxazdd0qd0ky6dh1qry12fk8qyp5kdamhbdx".into()),
-                ("outj".into(), "/0gkw1366qklqfqb2lw1pikgdqh3cmi3nw6f1z04an44ia863nxaz".into()),
+                ("outa".into(), Placeholder::standard_output(&"outa".parse().unwrap()).render().to_string_lossy().to_string().into()),
+                ("outb".into(), Placeholder::standard_output(&"outb".parse().unwrap()).render().to_string_lossy().to_string().into()),
+                ("outc".into(), Placeholder::standard_output(&"outc".parse().unwrap()).render().to_string_lossy().to_string().into()),
+                ("outd".into(), Placeholder::standard_output(&"outd".parse().unwrap()).render().to_string_lossy().to_string().into()),
+                ("oute".into(), Placeholder::standard_output(&"oute".parse().unwrap()).render().to_string_lossy().to_string().into()),
+                ("outf".into(), Placeholder::standard_output(&"outf".parse().unwrap()).render().to_string_lossy().to_string().into()),
+                ("outg".into(), Placeholder::standard_output(&"outg".parse().unwrap()).render().to_string_lossy().to_string().into()),
+                ("outh".into(), Placeholder::standard_output(&"outh".parse().unwrap()).render().to_string_lossy().to_string().into()),
+                ("outi".into(), Placeholder::standard_output(&"outi".parse().unwrap()).render().to_string_lossy().to_string().into()),
+                ("outj".into(), Placeholder::standard_output(&"outj".parse().unwrap()).render().to_string_lossy().to_string().into()),
             ]),
             inputs: BTreeSet::new(),
             name: "multi-output-test".parse().unwrap(),
@@ -745,7 +759,11 @@ pub(crate) mod tests {
                 ("name".into(), "myname".into()),
                 (
                     "out".into(),
-                    "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9".into(),
+                    Placeholder::standard_output(&"out".parse().unwrap())
+                        .render()
+                        .to_string_lossy()
+                        .to_string()
+                        .into(),
                 ),
                 ("system".into(), system.into()),
             ]),
@@ -797,7 +815,11 @@ pub(crate) mod tests {
                 ("name".into(), "failing".into()),
                 (
                     "out".into(),
-                    "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9".into(),
+                    Placeholder::standard_output(&"out".parse().unwrap())
+                        .render()
+                        .to_string_lossy()
+                        .to_string()
+                        .into(),
                 ),
                 ("system".into(), system.clone().into()),
             ]),
@@ -849,7 +871,11 @@ pub(crate) mod tests {
                 ("name".into(), "no-output".into()),
                 (
                     "out".into(),
-                    "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9".into(),
+                    Placeholder::standard_output(&"out".parse().unwrap())
+                        .render()
+                        .to_string_lossy()
+                        .to_string()
+                        .into(),
                 ),
                 ("system".into(), system.clone().into()),
             ]),
