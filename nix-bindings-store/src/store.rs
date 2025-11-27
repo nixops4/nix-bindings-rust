@@ -581,8 +581,10 @@ mod tests {
                     "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
                     "system": "{}"
                 }},
-                "inputDrvs": {{}},
-                "inputSrcs": [],
+                "inputs": {{
+                    "drvs": {{}},
+                    "srcs": []
+                }},
                 "name": "myname",
                 "outputs": {{
                     "out": {{
@@ -591,7 +593,7 @@ mod tests {
                     }}
                 }},
                 "system": "{}",
-                "version": 3
+                "version": 4
             }}"#,
             system, system
         )
@@ -664,7 +666,7 @@ mod tests {
 
         format!(
             r#"{{
-                "version": 3,
+                "version": 4,
                 "name": "multi-output-test",
                 "system": "{}",
                 "builder": "/bin/sh",
@@ -684,8 +686,10 @@ mod tests {
                     "outj": "/0gkw1366qklqfqb2lw1pikgdqh3cmi3nw6f1z04an44ia863nxaz",
                     "outa": "/039akv9zfpihrkrv4pl54f3x231x362bll9afblsgfqgvx96h198"
                 }},
-                "inputDrvs": {{}},
-                "inputSrcs": [],
+                "inputs": {{
+                    "drvs": {{}},
+                    "srcs": []
+                }},
                 "outputs": {{
                     "outd": {{ "hashAlgo": "sha256", "method": "nar" }},
                     "outf": {{ "hashAlgo": "sha256", "method": "nar" }},
@@ -740,8 +744,10 @@ mod tests {
                     "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
                     "system": "{}"
                 }},
-                "inputDrvs": {{}},
-                "inputSrcs": [],
+                "inputs": {{
+                    "drvs": {{}},
+                    "srcs": []
+                }},
                 "name": "myname",
                 "outputs": {{
                     "out": {{
@@ -750,7 +756,7 @@ mod tests {
                     }}
                 }},
                 "system": "{}",
-                "version": 3
+                "version": 4
             }}"#,
             system, system
         );
@@ -794,8 +800,10 @@ mod tests {
                     "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
                     "system": "{}"
                 }},
-                "inputDrvs": {{}},
-                "inputSrcs": [],
+                "inputs": {{
+                    "drvs": {{}},
+                    "srcs": []
+                }},
                 "name": "failing",
                 "outputs": {{
                     "out": {{
@@ -804,7 +812,7 @@ mod tests {
                     }}
                 }},
                 "system": "{}",
-                "version": 3
+                "version": 4
             }}"#,
             system, system
         );
@@ -848,8 +856,10 @@ mod tests {
                     "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
                     "system": "{}"
                 }},
-                "inputDrvs": {{}},
-                "inputSrcs": [],
+                "inputs": {{
+                    "drvs": {{}},
+                    "srcs": []
+                }},
                 "name": "no-output",
                 "outputs": {{
                     "out": {{
@@ -858,7 +868,7 @@ mod tests {
                     }}
                 }},
                 "system": "{}",
-                "version": 3
+                "version": 4
             }}"#,
             system, system
         );
