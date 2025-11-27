@@ -12,6 +12,7 @@ path = "src/lib.rs"
 anyhow = "1.0"
 nix-bindings-store = { path = "../nix-bindings-store" }
 harmonia-store-core = { git = "https://github.com/nix-community/harmonia.git" }
+serde_json = "1.0"
 
 [dev-dependencies]
 ctor = "0.2"

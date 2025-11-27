@@ -3,13 +3,17 @@
 //! This crate provides conversions between nix-bindings-store types and
 //! harmonia-store-core types.
 //!
-//! **Requires Nix 2.33 or later for StorePath conversions.**
+//! **Requires Nix 2.33 or later.**
 
 #[cfg(nix_at_least = "2.33")]
 use anyhow::{Context as AnyhowContext, Result};
 
 // Re-export the main types for convenience
+#[cfg(nix_at_least = "2.33")]
+pub use nix_bindings_store::derivation::Derivation;
 pub use nix_bindings_store::path::{StorePath, STORE_PATH_HASH_SIZE};
+#[cfg(nix_at_least = "2.33")]
+pub use nix_bindings_store::store::Store;
 
 // StorePath conversions - require Nix 2.33 for from_parts() and hash()
 #[cfg(nix_at_least = "2.33")]
@@ -65,6 +69,43 @@ impl TryFrom<StorePath> for harmonia_store_core::store_path::StorePath {
     }
 }
 
+// Derivation conversions - require Nix 2.33
+#[cfg(nix_at_least = "2.33")]
+impl TryFrom<&Derivation> for harmonia_store_core::derivation::Derivation {
+    type Error = anyhow::Error;
+
+    fn try_from(nix_drv: &Derivation) -> Result<Self> {
+        let json = nix_drv
+            .to_json()
+            .context("Failed to convert nix Derivation to JSON")?;
+
+        serde_json::from_str(&json).context("Failed to parse JSON as harmonia Derivation")
+    }
+}
+
+#[cfg(nix_at_least = "2.33")]
+impl TryFrom<Derivation> for harmonia_store_core::derivation::Derivation {
+    type Error = anyhow::Error;
+
+    fn try_from(nix_drv: Derivation) -> Result<Self> {
+        (&nix_drv).try_into()
+    }
+}
+
+/// Convert harmonia Derivation to nix-bindings Derivation.
+///
+/// This requires a Store instance because the Nix C API needs it for internal validation.
+#[cfg(nix_at_least = "2.33")]
+pub fn harmonia_derivation_to_nix(
+    store: &mut Store,
+    harmonia_drv: &harmonia_store_core::derivation::Derivation,
+) -> Result<Derivation> {
+    let json = serde_json::to_string(harmonia_drv)
+        .context("Failed to serialize harmonia Derivation to JSON")?;
+
+    store.derivation_from_json(&json)
+}
+
 #[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
@@ -82,5 +123,74 @@ mod tests {
             (&nix_path).try_into().unwrap();
 
         assert_eq!(harmonia_path, harmonia_round_trip);
+    }
+
+    #[cfg(nix_at_least = "2.33")]
+    fn create_test_derivation() -> harmonia_store_core::derivation::Derivation {
+        use harmonia_store_core::derivation::{self, Derivation, Output};
+        use std::collections::BTreeMap;
+
+        let system = format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS);
+        let out_path = "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9";
+
+        let mut env = BTreeMap::new();
+        env.insert("builder".to_string(), "/bin/sh".to_string());
+        env.insert("name".to_string(), "myname".to_string());
+        env.insert("out".to_string(), out_path.to_string());
+        env.insert("system".to_string(), system.clone());
+
+        let mut outputs = BTreeMap::new();
+        outputs.insert(
+            "out".to_string(),
+            Output::InputAddressed(derivation::InputAddressed {
+                path: out_path.to_string(),
+            }),
+        );
+
+        Derivation {
+            args: vec!["-c".to_string(), "echo $name foo > $out".to_string()],
+            builder: "/bin/sh".to_string(),
+            env,
+            inputs: derivation::Inputs {
+                drvs: BTreeMap::new(),
+                srcs: vec![],
+            },
+            name: "myname".to_string(),
+            outputs,
+            system,
+        }
+    }
+
+    #[test]
+    #[cfg(nix_at_least = "2.33")]
+    fn derivation_round_trip_harmonia() {
+        let mut store = Store::open(Some("dummy://"), []).unwrap();
+        let harmonia_drv = create_test_derivation();
+
+        // Convert to nix-bindings Derivation
+        let nix_drv = harmonia_derivation_to_nix(&mut store, &harmonia_drv).unwrap();
+
+        // Convert back to harmonia Derivation
+        let harmonia_round_trip: harmonia_store_core::derivation::Derivation =
+            (&nix_drv).try_into().unwrap();
+
+        assert_eq!(harmonia_drv, harmonia_round_trip);
+    }
+
+    #[test]
+    #[cfg(nix_at_least = "2.33")]
+    fn derivation_clone() {
+        let mut store = Store::open(Some("dummy://"), []).unwrap();
+        let harmonia_drv = create_test_derivation();
+
+        let derivation = harmonia_derivation_to_nix(&mut store, &harmonia_drv).unwrap();
+        let cloned_derivation = derivation.clone();
+
+        let original_harmonia: harmonia_store_core::derivation::Derivation =
+            (&derivation).try_into().unwrap();
+        let cloned_harmonia: harmonia_store_core::derivation::Derivation =
+            (&cloned_derivation).try_into().unwrap();
+
+        assert_eq!(original_harmonia, cloned_harmonia);
     }
 }
