@@ -1,7 +1,11 @@
 use std::ptr::NonNull;
 
 use anyhow::Result;
+#[cfg(nix_at_least = "2.33")]
+use anyhow::Context as AnyhowContext;
 use nix_bindings_store_sys as raw;
+#[cfg(nix_at_least = "2.33")]
+use nix_bindings_util::{check_call, context::Context};
 use nix_bindings_util::{
     result_string_init,
     string_return::{callback_get_result_string, callback_get_result_string_data},
@@ -131,5 +135,23 @@ mod tests {
             format!("{store_dir}/rdd4pnr4x9rqc9wgbibhngv217w2xvxl-bash-interactive-5.2p26");
         let store_path = store.parse_store_path(store_path_string.as_str()).unwrap();
         assert_eq!(store_path.name().unwrap(), "bash-interactive-5.2p26");
+    }
+
+    #[test]
+    #[cfg(nix_at_least = "2.33")]
+    fn store_path_clone() {
+        use super::StorePath;
+        // Import TryFrom impls from the harmonia integration crate
+        use nix_bindings_store_harmonia as _;
+
+        let harmonia_path: harmonia_store_core::store_path::StorePath =
+            "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv".parse().unwrap();
+
+        let nix_path: StorePath = (&harmonia_path).try_into().unwrap();
+        let cloned_path = nix_path.clone();
+
+        // Verify both paths have the same name and hash
+        assert_eq!(nix_path.name().unwrap(), cloned_path.name().unwrap());
+        assert_eq!(nix_path.hash().unwrap(), cloned_path.hash().unwrap());
     }
 }
