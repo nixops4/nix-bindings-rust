@@ -1,8 +1,8 @@
 use std::ptr::NonNull;
 
-use anyhow::Result;
 #[cfg(nix_at_least = "2.33")]
 use anyhow::Context as AnyhowContext;
+use anyhow::Result;
 use nix_bindings_store_sys as raw;
 #[cfg(nix_at_least = "2.33")]
 use nix_bindings_util::{check_call, context::Context};

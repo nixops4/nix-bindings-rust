@@ -19,6 +19,7 @@ serde_json = "1.0"
 
 [dev-dependencies]
 ctor = "0.2"
+harmonia-utils-hash = { git = "https://github.com/nix-community/harmonia.git" }
 tempfile = "3.10"
 harmonia-store-core = { git = "https://github.com/nix-community/harmonia.git" }
 nix-bindings-store-harmonia = { path = "../nix-bindings-store-harmonia" }

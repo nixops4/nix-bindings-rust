@@ -633,6 +633,7 @@ dependencies = [
  "anyhow",
  "ctor",
  "harmonia-store-core",
+ "harmonia-utils-hash",
  "lazy_static",
  "nix-bindings-store-harmonia",
  "nix-bindings-store-sys",
