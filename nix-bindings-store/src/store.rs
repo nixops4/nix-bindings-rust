@@ -2,11 +2,13 @@ use anyhow::{bail, Error, Result};
 use lazy_static::lazy_static;
 use nix_bindings_bindgen_raw as raw;
 use nix_bindings_util::context::Context;
-use nix_bindings_util::string_return::{callback_get_result_string, callback_get_result_string_data};
+use nix_bindings_util::string_return::{
+    callback_get_result_string, callback_get_result_string_data,
+};
 use nix_bindings_util::{check_call, result_string_init};
-use std::collections::HashMap;
 #[cfg(nix_at_least = "2.33")]
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::ffi::{c_char, CString};
 use std::ptr::null_mut;
 use std::ptr::NonNull;
@@ -309,8 +311,8 @@ impl Store {
                 self.inner.ptr(),
                 drv.inner.as_ptr()
             ))?;
-            let path = NonNull::new(path)
-                .ok_or_else(|| Error::msg("add_derivation returned null"))?;
+            let path =
+                NonNull::new(path).ok_or_else(|| Error::msg("add_derivation returned null"))?;
             Ok(StorePath::new_raw(path))
         }
     }
@@ -333,7 +335,8 @@ impl Store {
     #[doc(alias = "nix_store_realise")]
     pub fn realise(&mut self, path: &StorePath) -> Result<BTreeMap<String, StorePath>> {
         let mut outputs = BTreeMap::new();
-        let userdata = &mut outputs as *mut BTreeMap<String, StorePath> as *mut std::os::raw::c_void;
+        let userdata =
+            &mut outputs as *mut BTreeMap<String, StorePath> as *mut std::os::raw::c_void;
 
         unsafe extern "C" fn callback(
             userdata: *mut std::os::raw::c_void,
@@ -428,8 +431,8 @@ impl Clone for Store {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use ctor::ctor;
+    use std::collections::HashMap;
 
     use super::*;
 
@@ -446,7 +449,8 @@ mod tests {
 
         // Set custom build dir for sandbox
         if cfg!(target_os = "linux") {
-            nix_bindings_util::settings::set("sandbox-build-dir", "/custom-build-dir-for-test").ok();
+            nix_bindings_util::settings::set("sandbox-build-dir", "/custom-build-dir-for-test")
+                .ok();
         }
 
         std::env::set_var("_NIX_TEST_NO_SANDBOX", "1");
@@ -658,9 +662,8 @@ mod tests {
 
     #[cfg(nix_at_least = "2.33")]
     fn create_multi_output_derivation_json() -> String {
-        let system = current_system().unwrap_or_else(|_| {
-            format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
-        });
+        let system = current_system()
+            .unwrap_or_else(|_| format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS));
 
         format!(
             r#"{{
@@ -716,7 +719,9 @@ mod tests {
 
         // Verify outputs are complete (BTreeMap guarantees ordering)
         let output_names: Vec<&String> = outputs.keys().collect();
-        let expected_order = vec!["outa", "outb", "outc", "outd", "oute", "outf", "outg", "outh", "outi", "outj"];
+        let expected_order = vec![
+            "outa", "outb", "outc", "outd", "oute", "outf", "outg", "outh", "outi", "outj",
+        ];
         assert_eq!(output_names, expected_order);
 
         drop(store);
@@ -779,9 +784,8 @@ mod tests {
     fn realise_builder_fails() {
         let (mut store, temp_dir) = create_temp_store();
 
-        let system = current_system().unwrap_or_else(|_| {
-            format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
-        });
+        let system = current_system()
+            .unwrap_or_else(|_| format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS));
 
         // Create a derivation where the builder exits with error
         let drv_json = format!(
@@ -833,9 +837,8 @@ mod tests {
     fn realise_builder_no_output() {
         let (mut store, temp_dir) = create_temp_store();
 
-        let system = current_system().unwrap_or_else(|_| {
-            format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
-        });
+        let system = current_system()
+            .unwrap_or_else(|_| format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS));
 
         // Create a derivation where the builder succeeds but produces no output
         let drv_json = format!(
@@ -899,11 +902,17 @@ mod tests {
         let closure = store.get_fs_closure(&drv_path, false, true, false).unwrap();
 
         // The closure should contain at least the derivation and its output
-        assert!(closure.len() >= 2, "Closure should contain at least drv and output");
+        assert!(
+            closure.len() >= 2,
+            "Closure should contain at least drv and output"
+        );
 
         // Verify the output path is in the closure
         let out_in_closure = closure.iter().any(|p| p.name().unwrap() == out_path_name);
-        assert!(out_in_closure, "Output path should be in closure when include_outputs=true");
+        assert!(
+            out_in_closure,
+            "Output path should be in closure when include_outputs=true"
+        );
 
         drop(store);
         drop(temp_dir);
@@ -923,11 +932,16 @@ mod tests {
         let out_path_name = out_path.name().unwrap();
 
         // Get closure with include_outputs=false
-        let closure = store.get_fs_closure(&drv_path, false, false, false).unwrap();
+        let closure = store
+            .get_fs_closure(&drv_path, false, false, false)
+            .unwrap();
 
         // Verify the output path is NOT in the closure
         let out_in_closure = closure.iter().any(|p| p.name().unwrap() == out_path_name);
-        assert!(!out_in_closure, "Output path should not be in closure when include_outputs=false");
+        assert!(
+            !out_in_closure,
+            "Output path should not be in closure when include_outputs=false"
+        );
 
         drop(store);
         drop(temp_dir);
@@ -951,7 +965,10 @@ mod tests {
 
         // Verify the output path is NOT in the closure when direction is flipped
         let out_in_closure = closure.iter().any(|p| p.name().unwrap() == out_path_name);
-        assert!(!out_in_closure, "Output path should not be in closure when flip_direction=true");
+        assert!(
+            !out_in_closure,
+            "Output path should not be in closure when flip_direction=true"
+        );
 
         drop(store);
         drop(temp_dir);
@@ -975,7 +992,10 @@ mod tests {
 
         // Verify the derivation path is in the closure
         let drv_in_closure = closure.iter().any(|p| p.name().unwrap() == drv_path_name);
-        assert!(drv_in_closure, "Derivation should be in closure when include_derivers=true");
+        assert!(
+            drv_in_closure,
+            "Derivation should be in closure when include_derivers=true"
+        );
 
         drop(store);
         drop(temp_dir);

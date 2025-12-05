@@ -138,7 +138,9 @@ use nix_bindings_bindgen_raw as raw;
 use nix_bindings_store::path::StorePath;
 use nix_bindings_store::store::{Store, StoreWeak};
 use nix_bindings_util::context::Context;
-use nix_bindings_util::string_return::{callback_get_result_string, callback_get_result_string_data};
+use nix_bindings_util::string_return::{
+    callback_get_result_string, callback_get_result_string_data,
+};
 use nix_bindings_util::{check_call, check_call_opt_key, result_string_init};
 use std::ffi::{c_char, CString};
 use std::iter::FromIterator;
@@ -1217,7 +1219,8 @@ pub fn test_init() {
     // which causes an error. So we set a custom build dir here.
     // Only available on linux
     if cfg!(target_os = "linux") {
-        nix_bindings_util::settings::set("sandbox-build-dir", "/custom-build-dir-for-test").unwrap();
+        nix_bindings_util::settings::set("sandbox-build-dir", "/custom-build-dir-for-test")
+            .unwrap();
     }
     std::env::set_var("_NIX_TEST_NO_SANDBOX", "1");
 
@@ -1784,9 +1787,7 @@ mod tests {
         gc_registering_current_thread(|| {
             let store = Store::open(None, HashMap::new()).unwrap();
             let mut es = EvalState::new(store, []).unwrap();
-            let v = es
-                .eval_from_string("[ ]", "<test>")
-                .unwrap();
+            let v = es.eval_from_string("[ ]", "<test>").unwrap();
             es.force(&v).unwrap();
             let t = es.value_type_unforced(&v);
             assert!(t == Some(ValueType::List));
