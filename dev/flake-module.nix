@@ -6,6 +6,7 @@
   imports = [
     inputs.pre-commit-hooks-nix.flakeModule
     inputs.hercules-ci-effects.flakeModule
+    inputs.treefmt-nix.flakeModule
   ];
   perSystem =
     {
@@ -17,7 +18,20 @@
     {
       nix-bindings-rust.nixPackage = inputs'.nix.packages.default;
 
-      pre-commit.settings.hooks.nixfmt-rfc-style.enable = true;
+      treefmt = {
+        # Used to find the project root
+        projectRootFile = "flake.lock";
+
+        programs.rustfmt = {
+          enable = true;
+          edition = "2021";
+        };
+        programs.nixfmt.enable = true;
+        programs.deadnix.enable = true;
+        #programs.clang-format.enable = true;
+      };
+
+      pre-commit.settings.hooks.treefmt.enable = true;
       # Temporarily disable rustfmt due to configuration issues
       # pre-commit.settings.hooks.rustfmt.enable = true;
       pre-commit.settings.settings.rust.cargoManifestPath = "./Cargo.toml";
@@ -90,7 +104,7 @@
       };
     };
   herculesCI =
-    { config, ... }:
+    { ... }:
     {
       ciSystems = [ "x86_64-linux" ];
     };

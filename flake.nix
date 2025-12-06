@@ -11,11 +11,10 @@
   };
 
   outputs =
-    inputs@{ self, flake-parts, ... }:
+    inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } (
       toplevel@{
         lib,
-        withSystem,
         ...
       }:
       let
@@ -24,9 +23,7 @@
         */
         flake-parts-modules.basic =
           {
-            config,
             flake-parts-lib,
-            withSystem,
             ...
           }:
           {
@@ -114,7 +111,7 @@
         */
         flake-parts-modules.tested =
           # Consumer toplevel
-          { options, config, ... }:
+          { config, ... }:
           {
             _file = ./flake.nix;
             imports = [ flake-parts-modules.basic ];
@@ -177,10 +174,7 @@
         ];
         perSystem =
           {
-            config,
-            self',
             inputs',
-            pkgs,
             ...
           }:
           {

@@ -45,7 +45,10 @@ impl FlakeSettings {
 
 pub trait EvalStateBuilderExt {
     /// Configures the eval state to provide flakes features such as `builtins.getFlake`.
-    fn flakes(self, settings: &FlakeSettings) -> Result<nix_bindings_expr::eval_state::EvalStateBuilder>;
+    fn flakes(
+        self,
+        settings: &FlakeSettings,
+    ) -> Result<nix_bindings_expr::eval_state::EvalStateBuilder>;
 }
 impl EvalStateBuilderExt for nix_bindings_expr::eval_state::EvalStateBuilder {
     /// Configures the eval state to provide flakes features such as `builtins.getFlake`.
