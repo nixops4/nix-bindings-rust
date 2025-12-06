@@ -1,6 +1,6 @@
 [package]
 name = "nix-bindings-expr"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 license = "LGPL-2.1"
 description = "Rust bindings to Nix expression evaluator"
@@ -11,9 +11,12 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-nix-bindings-store = { path = "../nix-bindings-store", version = "0.1.1" }
-nix-bindings-util = { path = "../nix-bindings-util", version = "0.1.1" }
-nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.1.1" }
+nix-bindings-store = { path = "../nix-bindings-store", version = "0.2.0" }
+nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.0" }
+nix-bindings-bdwgc-sys = { path = "../nix-bindings-bdwgc-sys", version = "0.2.0" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.0" }
+nix-bindings-store-sys = { path = "../nix-bindings-store-sys", version = "0.2.0" }
+nix-bindings-expr-sys = { path = "../nix-bindings-expr-sys", version = "0.2.0" }
 lazy_static = "1.4"
 ctor = "0.2"
 tempfile = "3.10"

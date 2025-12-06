@@ -3,12 +3,12 @@ use std::{ffi::CString, os::raw::c_char, ptr::NonNull};
 use anyhow::{Context as _, Result};
 use nix_bindings_expr::eval_state::EvalState;
 use nix_bindings_fetchers::FetchersSettings;
+use nix_bindings_flake_sys as raw;
 use nix_bindings_util::{
     context::{self, Context},
     result_string_init,
     string_return::{callback_get_result_string, callback_get_result_string_data},
 };
-use nix_bindings_util_sys as raw;
 
 /// Store settings for the flakes feature.
 pub struct FlakeSettings {

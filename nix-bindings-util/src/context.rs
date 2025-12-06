@@ -113,7 +113,7 @@ macro_rules! check_call_opt_key {
         {
             let ctx : &mut $crate::context::Context = $ctx;
             let ret = $($f)::*(ctx.ptr(), $($arg,)*);
-            if unsafe { raw::err_code(ctx.ptr()) == raw::err_NIX_ERR_KEY } {
+            if unsafe { $crate::raw_sys::err_code(ctx.ptr()) == $crate::raw_sys::err_NIX_ERR_KEY } {
                 ctx.clear();
                 return Ok(None);
             }

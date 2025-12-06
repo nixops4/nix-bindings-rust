@@ -1,8 +1,9 @@
 use crate::eval_state::{EvalState, EvalStateWeak};
 use crate::value::Value;
 use anyhow::Result;
+use nix_bindings_expr_sys as raw;
 use nix_bindings_util::check_call;
-use nix_bindings_util_sys as raw;
+use nix_bindings_util_sys as raw_util;
 use std::ffi::{c_int, c_void, CStr, CString};
 use std::mem::ManuallyDrop;
 use std::ptr::{null, null_mut};
@@ -84,7 +85,7 @@ struct PrimOpContext {
 
 unsafe extern "C" fn function_adapter(
     user_data: *mut ::std::os::raw::c_void,
-    context_out: *mut raw::c_context,
+    context_out: *mut raw_util::c_context,
     _state: *mut raw::EvalState,
     args: *mut *mut raw::Value,
     ret: *mut raw::Value,
@@ -111,7 +112,7 @@ unsafe extern "C" fn function_adapter(
                 CString::new("<rust nix-expr application error message contained null byte>")
                     .unwrap()
             });
-            raw::set_err_msg(context_out, raw::err_NIX_ERR_UNKNOWN, cstr.as_ptr());
+            raw_util::set_err_msg(context_out, raw_util::err_NIX_ERR_UNKNOWN, cstr.as_ptr());
         },
     }
 }

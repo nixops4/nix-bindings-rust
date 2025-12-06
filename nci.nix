@@ -2,8 +2,24 @@
   perSystem =
     {
       config,
+      pkgs,
       ...
     }:
+    let
+      cfg = config.nix-bindings-rust;
+      nixLibs =
+        if cfg.nixPackage ? libs then
+          cfg.nixPackage.libs
+        else
+          # Fallback for older Nix versions without split libs
+          {
+            nix-util-c = cfg.nixPackage;
+            nix-store-c = cfg.nixPackage;
+            nix-expr-c = cfg.nixPackage;
+            nix-fetchers-c = cfg.nixPackage;
+            nix-flake-c = cfg.nixPackage;
+          };
+    in
     {
       # https://flake.parts/options/nix-cargo-integration
       nci.projects.nix-bindings = {
@@ -42,12 +58,46 @@
               echo "experimental-features = ca-derivations flakes" > "$NIX_CONF_DIR/nix.conf"
 
               # Init ahead of time, because concurrent initialization is flaky
-              ${config.nix-bindings-rust.nixPackage}/bin/nix-store --init
+              ${cfg.nixPackage}/bin/nix-store --init
 
               echo "Store initialized."
             '';
           };
         };
       };
+
+      # Per-crate configuration: only provide the specific Nix libs each crate needs
+      # FIXME should use propagatedBuildInputs
+      nci.crates.nix-bindings-bdwgc-sys.drvConfig.mkDerivation.buildInputs = [
+        pkgs.boehmgc
+      ];
+      nci.crates.nix-bindings-util-sys.drvConfig.mkDerivation.buildInputs = [
+        nixLibs.nix-util-c
+      ];
+      nci.crates.nix-bindings-util.drvConfig.mkDerivation.buildInputs =
+        config.nci.crates.nix-bindings-util-sys.drvConfig.mkDerivation.buildInputs;
+      nci.crates.nix-bindings-store-sys.drvConfig.mkDerivation.buildInputs =
+        config.nci.crates.nix-bindings-util-sys.drvConfig.mkDerivation.buildInputs
+        ++ [ nixLibs.nix-store-c ];
+      nci.crates.nix-bindings-store.drvConfig.mkDerivation.buildInputs =
+        config.nci.crates.nix-bindings-store-sys.drvConfig.mkDerivation.buildInputs;
+      nci.crates.nix-bindings-expr-sys.drvConfig.mkDerivation.buildInputs =
+        config.nci.crates.nix-bindings-store-sys.drvConfig.mkDerivation.buildInputs
+        ++ [
+          nixLibs.nix-expr-c
+          pkgs.boehmgc
+        ];
+      nci.crates.nix-bindings-expr.drvConfig.mkDerivation.buildInputs =
+        config.nci.crates.nix-bindings-expr-sys.drvConfig.mkDerivation.buildInputs;
+      nci.crates.nix-bindings-fetchers-sys.drvConfig.mkDerivation.buildInputs =
+        config.nci.crates.nix-bindings-expr-sys.drvConfig.mkDerivation.buildInputs
+        ++ [ nixLibs.nix-fetchers-c ];
+      nci.crates.nix-bindings-fetchers.drvConfig.mkDerivation.buildInputs =
+        config.nci.crates.nix-bindings-fetchers-sys.drvConfig.mkDerivation.buildInputs;
+      nci.crates.nix-bindings-flake-sys.drvConfig.mkDerivation.buildInputs =
+        config.nci.crates.nix-bindings-fetchers-sys.drvConfig.mkDerivation.buildInputs
+        ++ [ nixLibs.nix-flake-c ];
+      nci.crates.nix-bindings-flake.drvConfig.mkDerivation.buildInputs =
+        config.nci.crates.nix-bindings-flake-sys.drvConfig.mkDerivation.buildInputs;
     };
 }

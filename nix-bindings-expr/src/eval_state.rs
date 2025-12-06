@@ -134,14 +134,16 @@ use anyhow::Context as _;
 use anyhow::{bail, Result};
 use cstr::cstr;
 use lazy_static::lazy_static;
+use nix_bindings_bdwgc_sys as gc;
+use nix_bindings_expr_sys as raw;
 use nix_bindings_store::path::StorePath;
 use nix_bindings_store::store::{Store, StoreWeak};
+use nix_bindings_store_sys as raw_store;
 use nix_bindings_util::context::Context;
 use nix_bindings_util::string_return::{
     callback_get_result_string, callback_get_result_string_data,
 };
 use nix_bindings_util::{check_call, check_call_opt_key, result_string_init};
-use nix_bindings_util_sys as raw;
 use std::ffi::{c_char, CString};
 use std::iter::FromIterator;
 use std::os::raw::c_uint;
@@ -151,7 +153,7 @@ use std::sync::{Arc, Weak};
 lazy_static! {
     static ref INIT: Result<()> = {
         unsafe {
-            raw::GC_allow_register_threads();
+            gc::GC_allow_register_threads();
             check_call!(raw::libexpr_init(&mut Context::new()))?;
             Ok(())
         }
@@ -887,7 +889,7 @@ impl EvalState {
             let mut paths = Vec::with_capacity(n as usize);
             for i in 0..n {
                 let path = raw::realised_string_get_store_path(rs, i);
-                let path = NonNull::new(path as *mut raw::StorePath).ok_or_else(|| {
+                let path = NonNull::new(path as *mut raw_store::StorePath).ok_or_else(|| {
                     anyhow::format_err!(
                         "nix_realised_string_get_store_path returned a null pointer"
                     )
@@ -1153,7 +1155,7 @@ impl Drop for ThreadRegistrationGuard {
     fn drop(&mut self) {
         if self.must_unregister {
             unsafe {
-                raw::GC_unregister_my_thread();
+                gc::GC_unregister_my_thread();
             }
         }
     }
@@ -1161,14 +1163,14 @@ impl Drop for ThreadRegistrationGuard {
 
 fn gc_register_my_thread_do_it() -> Result<()> {
     unsafe {
-        let mut sb: raw::GC_stack_base = raw::GC_stack_base {
+        let mut sb: gc::GC_stack_base = gc::GC_stack_base {
             mem_base: null_mut(),
         };
-        let r = raw::GC_get_stack_base(&mut sb);
-        if r as u32 != raw::GC_SUCCESS {
+        let r = gc::GC_get_stack_base(&mut sb);
+        if r as u32 != gc::GC_SUCCESS {
             Err(anyhow::format_err!("GC_get_stack_base failed: {}", r))?;
         }
-        raw::GC_register_my_thread(&sb);
+        gc::GC_register_my_thread(&sb);
         Ok(())
     }
 }
@@ -1179,7 +1181,7 @@ fn gc_register_my_thread_do_it() -> Result<()> {
 pub fn gc_register_my_thread() -> Result<ThreadRegistrationGuard> {
     init()?;
     unsafe {
-        let already_done = raw::GC_thread_is_registered();
+        let already_done = gc::GC_thread_is_registered();
         if already_done != 0 {
             return Ok(ThreadRegistrationGuard {
                 must_unregister: false,

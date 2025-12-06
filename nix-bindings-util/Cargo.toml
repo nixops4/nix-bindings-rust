@@ -1,6 +1,6 @@
 [package]
 name = "nix-bindings-util"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 license = "LGPL-2.1"
 description = "Rust bindings to Nix utility library"
@@ -11,7 +11,9 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.1.1" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.0" }
+
+[dev-dependencies]
 ctor = "0.2"
 
 [lints.rust]

@@ -1,11 +1,12 @@
 use anyhow::{bail, Error, Result};
 use lazy_static::lazy_static;
+use nix_bindings_store_sys as raw;
 use nix_bindings_util::context::Context;
 use nix_bindings_util::string_return::{
     callback_get_result_string, callback_get_result_string_data,
 };
 use nix_bindings_util::{check_call, result_string_init};
-use nix_bindings_util_sys as raw;
+use nix_bindings_util_sys as raw_util;
 #[cfg(nix_at_least = "2.33.0pre")]
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -73,7 +74,7 @@ lazy_static! {
 
 #[cfg(nix_at_least = "2.33.0pre")]
 unsafe extern "C" fn callback_get_result_store_path_set(
-    _context: *mut raw::c_context,
+    _context: *mut raw_util::c_context,
     user_data: *mut std::os::raw::c_void,
     store_path: *const raw::StorePath,
 ) {

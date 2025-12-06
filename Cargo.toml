@@ -1,6 +1,11 @@
 [workspace]
 members = [
+    "nix-bindings-bdwgc-sys",
     "nix-bindings-util-sys",
+    "nix-bindings-store-sys",
+    "nix-bindings-expr-sys",
+    "nix-bindings-fetchers-sys",
+    "nix-bindings-flake-sys",
     "nix-bindings-expr",
     "nix-bindings-fetchers",
     "nix-bindings-flake",

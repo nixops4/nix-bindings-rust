@@ -1,6 +1,6 @@
 //! Functions that are relevant for other bindings modules, but normally not end users.
 use super::Value;
-use nix_bindings_util_sys as raw;
+use nix_bindings_expr_sys as raw;
 
 /// Take ownership of a new [`Value`].
 ///

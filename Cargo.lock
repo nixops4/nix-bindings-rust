@@ -209,35 +209,65 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
+name = "nix-bindings-bdwgc-sys"
+version = "0.2.0"
+dependencies = [
+ "bindgen",
+ "pkg-config",
+]
+
+[[package]]
 name = "nix-bindings-expr"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cstr",
  "ctor",
  "lazy_static",
+ "nix-bindings-bdwgc-sys",
+ "nix-bindings-expr-sys",
  "nix-bindings-store",
+ "nix-bindings-store-sys",
  "nix-bindings-util",
  "nix-bindings-util-sys",
  "tempfile",
+]
+
+[[package]]
+name = "nix-bindings-expr-sys"
+version = "0.2.0"
+dependencies = [
+ "bindgen",
+ "nix-bindings-store-sys",
+ "nix-bindings-util-sys",
+ "pkg-config",
 ]
 
 [[package]]
 name = "nix-bindings-fetchers"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cstr",
  "ctor",
+ "nix-bindings-fetchers-sys",
  "nix-bindings-store",
  "nix-bindings-util",
- "nix-bindings-util-sys",
  "tempfile",
 ]
 
 [[package]]
+name = "nix-bindings-fetchers-sys"
+version = "0.2.0"
+dependencies = [
+ "bindgen",
+ "nix-bindings-util-sys",
+ "pkg-config",
+]
+
+[[package]]
 name = "nix-bindings-flake"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cstr",
@@ -245,19 +275,33 @@ dependencies = [
  "lazy_static",
  "nix-bindings-expr",
  "nix-bindings-fetchers",
+ "nix-bindings-flake-sys",
  "nix-bindings-store",
  "nix-bindings-util",
- "nix-bindings-util-sys",
  "tempfile",
 ]
 
 [[package]]
+name = "nix-bindings-flake-sys"
+version = "0.2.0"
+dependencies = [
+ "bindgen",
+ "nix-bindings-bdwgc-sys",
+ "nix-bindings-expr-sys",
+ "nix-bindings-fetchers-sys",
+ "nix-bindings-store-sys",
+ "nix-bindings-util-sys",
+ "pkg-config",
+]
+
+[[package]]
 name = "nix-bindings-store"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "ctor",
  "lazy_static",
+ "nix-bindings-store-sys",
  "nix-bindings-util",
  "nix-bindings-util-sys",
  "pkg-config",
@@ -265,8 +309,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nix-bindings-store-sys"
+version = "0.2.0"
+dependencies = [
+ "bindgen",
+ "nix-bindings-util-sys",
+ "pkg-config",
+]
+
+[[package]]
 name = "nix-bindings-util"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "ctor",
@@ -275,7 +328,7 @@ dependencies = [
 
 [[package]]
 name = "nix-bindings-util-sys"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "bindgen",
  "pkg-config",
