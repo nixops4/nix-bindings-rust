@@ -8,8 +8,6 @@
     nix-cargo-integration.url = "github:yusdacra/nix-cargo-integration";
     nix-cargo-integration.inputs.nixpkgs.follows = "nixpkgs";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    treefmt-nix.url = "github:numtide/treefmt-nix";
-    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -164,7 +162,6 @@
           inputs.nix-cargo-integration.flakeModule
           inputs.flake-parts.flakeModules.partitions
           inputs.flake-parts.flakeModules.modules
-          inputs.treefmt-nix.flakeModule
           # dogfood
           flake-parts-modules.tested
           ./nci.nix
@@ -182,19 +179,6 @@
           }:
           {
             packages.nix = inputs'.nix.packages.nix;
-
-            treefmt = {
-              # Used to find the project root
-              projectRootFile = "flake.lock";
-
-              programs.rustfmt = {
-                enable = true;
-                edition = "2021";
-              };
-              programs.nixfmt.enable = true;
-              programs.deadnix.enable = true;
-              #programs.clang-format.enable = true;
-            };
           };
 
         partitionedAttrs.devShells = "dev";
