@@ -52,9 +52,9 @@ macro_rules! result_string_init {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nix_bindings_bindgen_raw as raw;
+    use nix_bindings_util_sys as raw;
 
-    /// Typecheck the function signature against the generated bindings in nix_bindings_bindgen_raw.
+    /// Typecheck the function signature against the generated bindings in nix_bindings_util_sys.
     static _CALLBACK_GET_RESULT_STRING: raw::get_string_callback = Some(callback_get_result_string);
 
     #[test]

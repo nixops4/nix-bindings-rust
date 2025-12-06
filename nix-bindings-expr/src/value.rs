@@ -1,6 +1,6 @@
 pub mod __private;
 
-use nix_bindings_bindgen_raw as raw;
+use nix_bindings_expr_sys as raw;
 use nix_bindings_util::{check_call, context::Context};
 use std::ptr::{null_mut, NonNull};
 
