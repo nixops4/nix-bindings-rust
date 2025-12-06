@@ -111,13 +111,13 @@
         */
         flake-parts-modules.tested =
           # Consumer toplevel
-          { config, ... }:
+          { ... }:
           {
             _file = ./flake.nix;
             imports = [ flake-parts-modules.basic ];
             config.perSystem =
               # Consumer perSystem
-              consumerPerSystem@{
+              {
                 lib,
                 config,
                 system,
@@ -135,9 +135,9 @@
                         {
                           config = {
                             # Overriding our `perSystem` to use the consumer's `pkgs`
-                            _module.args.pkgs = lib.mkForce consumerPerSystem.pkgs;
+                            _module.args.pkgs = lib.mkForce pkgs;
                             # ... and `nixPackage`
-                            nix-bindings-rust.nixPackage = lib.mkForce consumerPerSystem.config.nix-bindings-rust.nixPackage;
+                            nix-bindings-rust.nixPackage = lib.mkForce config.nix-bindings-rust.nixPackage;
                           };
                         }
                       ];
