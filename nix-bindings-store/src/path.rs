@@ -1,7 +1,7 @@
 use std::ptr::NonNull;
 
 use anyhow::Result;
-use nix_bindings_bindgen_raw as raw;
+use nix_bindings_store_sys as raw;
 use nix_bindings_util::{
     result_string_init,
     string_return::{callback_get_result_string, callback_get_result_string_data},

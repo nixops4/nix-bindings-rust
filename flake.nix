@@ -29,10 +29,7 @@
           {
             _file = ./flake.nix;
             options.perSystem = flake-parts-lib.mkPerSystemOption (
-              { config, pkgs, ... }:
-              let
-                cfg = config.nix-bindings-rust;
-              in
+              { pkgs, ... }:
               {
                 options.nix-bindings-rust = {
                   nixPackage = lib.mkOption {
@@ -49,10 +46,25 @@
                       A module to load into your nix-cargo-integration
                       [`perSystem.nci.projects.<name>.depsDrvConfig`](https://flake.parts/options/nix-cargo-integration.html#opt-perSystem.nci.projects._name_.depsDrvConfig) or similar such options.
 
+                      This provides common build configuration (pkg-config, libclang, etc.) but you must
+                      add the specific Nix C libraries your crates need to `buildInputs`:
+                      - `nix-bindings-util-sys` needs `nix-util-c`
+                      - `nix-bindings-store-sys` needs `nix-store-c`
+                      - `nix-bindings-expr-sys` needs `nix-expr-c`
+                      - `nix-bindings-fetchers-sys` needs `nix-fetchers-c` (Nix >= 2.29)
+                      - `nix-bindings-flake-sys` needs `nix-flake-c`
+                      - `nix-bindings-bdwgc-sys` needs `boehmgc`
+
                       Example:
                       ```nix
-                      perSystem = perSystem@{ config, ... }: {
-                        nci.projects."my_project".depsDrvConfig = perSystem.config.nix-bindings-rust.nciBuildConfig;
+                      perSystem = perSystem@{ config, pkgs, ... }: {
+                        nci.projects."my_project".depsDrvConfig = {
+                          imports = [ perSystem.config.nix-bindings-rust.nciBuildConfig ];
+                          mkDerivation.buildInputs = [
+                            perSystem.config.nix-bindings-rust.nixPackage.libs.nix-store-c
+                            # ... add other libs as needed
+                          ];
+                        };
                       }
                       ```
                     '';
@@ -64,22 +76,7 @@
                       buildInputs = [
                         # stdbool.h
                         pkgs.stdenv.cc
-                      ]
-                      ++ (
-                        if cfg.nixPackage ? libs then
-                          let
-                            l = cfg.nixPackage.libs;
-                          in
-                          [
-                            l.nix-expr-c
-                            l.nix-store-c
-                            l.nix-util-c
-                            l.nix-fetchers-c or null # Nix >= 2.29
-                            l.nix-flake-c
-                          ]
-                        else
-                          [ cfg.nixPackage ]
-                      );
+                      ];
                       nativeBuildInputs = [
                         pkgs.pkg-config
                       ];
