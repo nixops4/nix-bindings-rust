@@ -81,6 +81,9 @@
           config.packages.nix
         ];
         nativeBuildInputs = [
+          pkgs.pre-commit
+          config.treefmt.build.wrapper
+
           pkgs.rust-analyzer
           pkgs.nixfmt-rfc-style
           pkgs.rustfmt
@@ -96,7 +99,6 @@
         ];
         shellHook = ''
           ${config.pre-commit.installationScript}
-          source ${../bindgen-gcc.sh}
           echo 1>&2 "Welcome to the development shell!"
         '';
         # rust-analyzer needs a NIX_PATH for some reason
