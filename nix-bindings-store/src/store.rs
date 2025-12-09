@@ -6,7 +6,7 @@ use nix_bindings_util::string_return::{
     callback_get_result_string, callback_get_result_string_data,
 };
 use nix_bindings_util::{check_call, result_string_init};
-#[cfg(nix_at_least = "2.33")]
+#[cfg(nix_at_least = "2.33.0pre")]
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::ffi::{c_char, CString};
@@ -14,7 +14,7 @@ use std::ptr::null_mut;
 use std::ptr::NonNull;
 use std::sync::{Arc, Mutex, Weak};
 
-#[cfg(nix_at_least = "2.33")]
+#[cfg(nix_at_least = "2.33.0pre")]
 use crate::derivation::Derivation;
 use crate::path::StorePath;
 
@@ -71,7 +71,7 @@ lazy_static! {
     static ref STORE_CACHE: Arc<Mutex<StoreCacheMap>> = Arc::new(Mutex::new(HashMap::new()));
 }
 
-#[cfg(nix_at_least = "2.33")]
+#[cfg(nix_at_least = "2.33.0pre")]
 unsafe extern "C" fn callback_get_result_store_path_set(
     _context: *mut raw::c_context,
     user_data: *mut std::os::raw::c_void,
@@ -88,7 +88,7 @@ unsafe extern "C" fn callback_get_result_store_path_set(
     ret.push(store_path);
 }
 
-#[cfg(nix_at_least = "2.33")]
+#[cfg(nix_at_least = "2.33.0pre")]
 fn callback_get_result_store_path_set_data(vec: &mut Vec<StorePath>) -> *mut std::os::raw::c_void {
     vec as *mut Vec<StorePath> as *mut std::os::raw::c_void
 }
@@ -274,7 +274,7 @@ impl Store {
     /// # Returns
     /// A [`Derivation`] object if parsing succeeds, or an error if the JSON is invalid
     /// or malformed.
-    #[cfg(nix_at_least = "2.33")]
+    #[cfg(nix_at_least = "2.33.0pre")]
     #[doc(alias = "nix_derivation_from_json")]
     pub fn derivation_from_json(&mut self, json: &str) -> Result<Derivation> {
         let json_cstr = CString::new(json)?;
@@ -302,7 +302,7 @@ impl Store {
     ///
     /// # Returns
     /// The store path of the derivation (ending in `.drv`).
-    #[cfg(nix_at_least = "2.33")]
+    #[cfg(nix_at_least = "2.33.0pre")]
     #[doc(alias = "nix_add_derivation")]
     pub fn add_derivation(&mut self, drv: &Derivation) -> Result<StorePath> {
         unsafe {
@@ -331,7 +331,7 @@ impl Store {
     /// # Returns
     /// A [`BTreeMap`] mapping output names (e.g., "out", "dev", "doc") to their store paths.
     /// The map is ordered alphabetically by output name for deterministic iteration.
-    #[cfg(nix_at_least = "2.33")]
+    #[cfg(nix_at_least = "2.33.0pre")]
     #[doc(alias = "nix_store_realise")]
     pub fn realise(&mut self, path: &StorePath) -> Result<BTreeMap<String, StorePath>> {
         let mut outputs = BTreeMap::new();
@@ -388,7 +388,7 @@ impl Store {
     ///
     /// # Returns
     /// A vector of store paths in the closure, in no particular order.
-    #[cfg(nix_at_least = "2.33")]
+    #[cfg(nix_at_least = "2.33.0pre")]
     #[doc(alias = "nix_store_get_fs_closure")]
     pub fn get_fs_closure(
         &mut self,
@@ -544,6 +544,7 @@ mod tests {
         assert!(weak.inner.upgrade().is_none());
     }
 
+    #[cfg(nix_at_least = "2.33.0pre")]
     fn create_temp_store() -> (Store, tempfile::TempDir) {
         let temp_dir = tempfile::tempdir().unwrap();
 
@@ -616,7 +617,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(nix_at_least = "2.33")]
+    #[cfg(nix_at_least = "2.33.0pre")]
     fn derivation_from_invalid_json() {
         let (mut store, temp_dir) = create_temp_store();
         let result = store.derivation_from_json("not valid json");
