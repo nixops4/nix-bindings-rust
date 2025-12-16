@@ -5,7 +5,7 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     nix.url = "github:NixOS/nix";
     nix.inputs.nixpkgs.follows = "nixpkgs";
-    nix-cargo-integration.url = "github:yusdacra/nix-cargo-integration";
+    nix-cargo-integration.url = "github:90-008/nix-cargo-integration";
     nix-cargo-integration.inputs.nixpkgs.follows = "nixpkgs";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
