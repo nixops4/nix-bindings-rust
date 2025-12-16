@@ -1382,7 +1382,7 @@ mod tests {
             let a = es.eval_from_string("2", "<test>").unwrap();
             let v = es.new_value_apply(&f, &a).unwrap();
             let t = es.value_type_unforced(&v);
-            assert!(t == None);
+            assert!(t.is_none());
             let i = es.require_int(&v).unwrap();
             assert!(i == 3);
         })
@@ -1398,9 +1398,9 @@ mod tests {
             let a = es.eval_from_string("true", "<test>").unwrap();
             let v = es.new_value_apply(&f, &a).unwrap();
             let t = es.value_type_unforced(&v);
-            assert!(t == None);
+            assert!(t.is_none());
             let i = es.require_bool(&v).unwrap();
-            assert!(i == false);
+            assert!(!i);
         })
         .unwrap();
     }
@@ -1423,7 +1423,7 @@ mod tests {
             let mut es = EvalState::new(store, []).unwrap();
             let v = make_thunk(&mut es, "1");
             let t = es.value_type_unforced(&v);
-            assert!(t == None);
+            assert!(t.is_none());
         })
         .unwrap();
     }
@@ -1450,7 +1450,7 @@ mod tests {
             let mut es = EvalState::new(store, []).unwrap();
             let v = make_thunk(&mut es, "{ a = 1; b = 2; }");
             let t = es.value_type_unforced(&v);
-            assert!(t == None);
+            assert!(t.is_none());
             let attrs = es.require_attrs_names_unsorted(&v).unwrap();
             assert_eq!(attrs.len(), 2);
         })
@@ -1507,7 +1507,7 @@ mod tests {
                     let s = format!("{e:#}");
                     if !s.contains("attribute `c` not found") {
                         eprintln!("unexpected error message: {}", s);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -1542,7 +1542,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("oh no the error") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -1594,7 +1594,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("oh no the error") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -1730,7 +1730,7 @@ mod tests {
             let t = es.value_type_unforced(&v);
             assert!(t == Some(ValueType::String));
             let s = es.require_string(&v).unwrap();
-            assert!(s == "");
+            assert!(s.is_empty());
         })
         .unwrap();
     }
@@ -1746,7 +1746,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("contains null byte") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -1832,7 +1832,7 @@ mod tests {
             let list: Vec<Value> = es.require_list_strict(&v).unwrap();
             assert_eq!(list.len(), 2);
             assert_eq!(es.require_int(&list[0]).unwrap(), 42);
-            assert_eq!(es.require_bool(&list[1]).unwrap(), true);
+            assert!(es.require_bool(&list[1]).unwrap());
         })
         .unwrap();
     }
@@ -1971,7 +1971,7 @@ mod tests {
             let f = es.eval_from_string("x: x + 1", "<test>").unwrap();
             let a = es.eval_from_string("2", "<test>").unwrap();
             let v = es.new_value_apply(&f, &a).unwrap();
-            assert!(es.value_type_unforced(&v) == None);
+            assert!(es.value_type_unforced(&v).is_none());
             es.force(&v).unwrap();
             let t = es.value_type_unforced(&v);
             assert!(t == Some(ValueType::Int));
@@ -1994,7 +1994,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("cannot coerce") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2017,7 +2017,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("expected an integer but found") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2041,7 +2041,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("cannot coerce") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2063,7 +2063,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("called without required argument") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2086,7 +2086,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("called without required argument") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2111,7 +2111,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("called without required argument") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2179,8 +2179,7 @@ mod tests {
             for derivation in derivations {
                 assert!(store_contents
                     .iter()
-                    .find(|f| f.as_encoded_bytes().ends_with(derivation))
-                    .is_some());
+                    .any(|f| f.as_encoded_bytes().ends_with(derivation)));
             }
             assert!(!empty(read_dir(state.path()).unwrap()));
 
@@ -2214,7 +2213,7 @@ mod tests {
                     let a = es.require_int(a)?;
                     let b = es.require_int(b)?;
                     let c = *bias.lock().unwrap();
-                    Ok(es.new_value_int(a + b + c)?)
+                    es.new_value_int(a + b + c)
                 }),
             )
             .unwrap();
@@ -2268,7 +2267,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("error with arg [2]") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2284,7 +2283,7 @@ mod tests {
             let v = es
                 .new_value_thunk(
                     "test_thunk",
-                    Box::new(move |es: &mut EvalState| Ok(es.new_value_int(42)?)),
+                    Box::new(move |es: &mut EvalState| es.new_value_int(42)),
                 )
                 .unwrap();
             es.force(&v).unwrap();
@@ -2318,11 +2317,11 @@ mod tests {
                         "error message in test case eval_state_primop_anon_call_no_args_lazy",
                     ) {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                     if !e.to_string().contains("test_thunk") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2345,7 +2344,7 @@ mod tests {
                 Box::new(|es, args| {
                     let a = es.require_int(&args[0])?;
                     let b = es.require_int(&args[1])?;
-                    Ok(es.new_value_int(a + b)?)
+                    es.new_value_int(a + b)
                 }),
             )
             .unwrap();
@@ -2385,11 +2384,11 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("The frob unexpectedly fizzled") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                     if !e.to_string().contains("frobnicate") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }

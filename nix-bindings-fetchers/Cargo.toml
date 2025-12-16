@@ -15,3 +15,6 @@ nix-bindings-bindgen-raw = { path = "../nix-bindings-bindgen-raw" }
 ctor = "0.2"
 tempfile = "3.10"
 cstr = "0.2"
+
+[lints]
+workspace = true

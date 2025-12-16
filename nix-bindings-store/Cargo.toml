@@ -22,3 +22,6 @@ tempfile = "3.10"
 pkg-config = "0.3"
 # Needed for version parsing in build.rs
 nix-bindings-util = { path = "../nix-bindings-util" }
+
+[lints]
+workspace = true

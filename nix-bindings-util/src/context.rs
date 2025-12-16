@@ -1,6 +1,5 @@
 use anyhow::{bail, Result};
 use nix_bindings_bindgen_raw as raw;
-use std::os::raw::c_char;
 use std::ptr::null_mut;
 use std::ptr::NonNull;
 
@@ -9,6 +8,12 @@ use std::ptr::NonNull;
 /// The `nix-store` and `nix-expr` libraries that consume this type internally store a private context in their `EvalState` and `Store` structs to avoid allocating a new context for each operation. The state of a context is irrelevant when used correctly (e.g. with [check_call!]), so it's safe to reuse, and safe to allocate more contexts in methods such as [Clone::clone].
 pub struct Context {
     inner: NonNull<raw::c_context>,
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Context {
@@ -48,11 +53,7 @@ impl Context {
 
     pub fn clear(&mut self) {
         unsafe {
-            raw::set_err_msg(
-                self.inner.as_ptr(),
-                raw::err_NIX_OK,
-                b"\0".as_ptr() as *const c_char,
-            );
+            raw::set_err_msg(self.inner.as_ptr(), raw::err_NIX_OK, c"".as_ptr());
         }
     }
 
@@ -143,8 +144,8 @@ mod tests {
         unsafe {
             raw::set_err_msg(
                 ctx_ptr,
-                raw::err_NIX_ERR_UNKNOWN.try_into().unwrap(),
-                b"dummy error message\0".as_ptr() as *const std::os::raw::c_char,
+                raw::err_NIX_ERR_UNKNOWN,
+                c"dummy error message".as_ptr(),
             );
         }
     }
