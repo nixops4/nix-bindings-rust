@@ -514,7 +514,7 @@ mod tests {
     #[test]
     fn parse_store_path_fail() {
         let mut store = crate::store::Store::open(Some("dummy://"), []).unwrap();
-        let store_path_string = format!("bash-interactive-5.2p26");
+        let store_path_string = "bash-interactive-5.2p26".to_string();
         let r = store.parse_store_path(store_path_string.as_str());
         match r {
             Err(e) => {

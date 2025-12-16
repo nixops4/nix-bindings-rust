@@ -11,3 +11,6 @@ path = "src/lib.rs"
 anyhow = "1.0"
 nix-bindings-bindgen-raw = { path = "../nix-bindings-bindgen-raw" }
 ctor = "0.2"
+
+[lints]
+workspace = true

@@ -148,7 +148,7 @@
                 key = "nix-bindings-rust-add-checks";
                 config.checks = lib.concatMapAttrs (
                   k: v:
-                  lib.optionalAttrs (lib.strings.hasPrefix "nix-bindings-" k && !lib.strings.hasSuffix "-clippy" k) {
+                  lib.optionalAttrs (lib.strings.hasPrefix "nix-bindings-" k) {
                     "dependency-${k}" = v;
                   }
                 ) nix-bindings-rust-perSystemConfig.config.checks;

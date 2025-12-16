@@ -65,7 +65,7 @@ pub fn parse_version(version_str: &str) -> (u32, u32, i32) {
     let parts = version_str.split('.').collect::<Vec<&str>>();
     let major = parts[0].parse::<u32>().unwrap();
     let minor = parts[1].parse::<u32>().unwrap();
-    let patch = if parts.get(2).map_or(false, |s| s.contains("pre")) {
+    let patch = if parts.get(2).is_some_and(|s| s.contains("pre")) {
         -1i32
     } else {
         parts

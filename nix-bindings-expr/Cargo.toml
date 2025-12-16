@@ -16,3 +16,6 @@ lazy_static = "1.4"
 ctor = "0.2"
 tempfile = "3.10"
 cstr = "0.2"
+
+[lints]
+workspace = true
