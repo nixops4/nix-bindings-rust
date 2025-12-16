@@ -1,9 +1,9 @@
 use std::{ffi::CString, os::raw::c_char, ptr::NonNull};
 
 use anyhow::{Context as _, Result};
-use nix_bindings_bindgen_raw as raw;
 use nix_bindings_expr::eval_state::EvalState;
 use nix_bindings_fetchers::FetchersSettings;
+use nix_bindings_flake_sys as raw;
 use nix_bindings_util::{
     context::{self, Context},
     result_string_init,
