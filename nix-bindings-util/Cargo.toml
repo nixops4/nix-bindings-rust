@@ -12,5 +12,11 @@ anyhow = "1.0"
 nix-bindings-bindgen-raw = { path = "../nix-bindings-bindgen-raw" }
 ctor = "0.2"
 
-[lints]
-workspace = true
+[lints.rust]
+warnings = "deny"
+dead-code = "allow"
+
+[lints.clippy]
+type-complexity = "allow"
+# We're still trying to make Nix more thread-safe, want forward-compat
+arc-with-non-send-sync = "allow"
