@@ -1,15 +1,21 @@
 use std::ptr::NonNull;
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use nix_bindings_store_sys as raw;
+#[cfg(nix_at_least = "2.33")]
+use nix_bindings_util::{check_call, context::Context};
 use nix_bindings_util::{
     result_string_init,
     string_return::{callback_get_result_string, callback_get_result_string_data},
 };
 
+/// The size of a store path hash in bytes (20 bytes, decoded from nix32).
+pub const STORE_PATH_HASH_SIZE: usize = 20;
+
 pub struct StorePath {
     raw: NonNull<raw::StorePath>,
 }
+
 impl StorePath {
     /// Get the name of the store path.
     ///
@@ -24,6 +30,43 @@ impl StorePath {
             );
             r
         }
+    }
+
+    /// Get the hash part of the store path.
+    ///
+    /// This returns the decoded hash (not the nix32-encoded string).
+    #[cfg(nix_at_least = "2.33")]
+    pub fn hash(&self) -> Result<[u8; STORE_PATH_HASH_SIZE]> {
+        let mut result = [0u8; STORE_PATH_HASH_SIZE];
+        let hash_part: &mut raw::store_path_hash_part = zerocopy::transmute_mut!(&mut result);
+
+        let mut ctx = Context::new();
+
+        unsafe {
+            check_call!(raw::store_path_hash(&mut ctx, self.as_ptr(), hash_part))?;
+        }
+        Ok(result)
+    }
+
+    /// Create a StorePath from hash and name components.
+    #[cfg(nix_at_least = "2.33")]
+    pub fn from_parts(hash: &[u8; STORE_PATH_HASH_SIZE], name: &str) -> Result<Self> {
+        let hash_part: &raw::store_path_hash_part = zerocopy::transmute_ref!(hash);
+
+        let mut ctx = Context::new();
+
+        let out_path = unsafe {
+            check_call!(raw::store_create_from_parts(
+                &mut ctx,
+                hash_part,
+                name.as_ptr() as *const i8,
+                name.len()
+            ))?
+        };
+
+        NonNull::new(out_path)
+            .map(|ptr| unsafe { Self::new_raw(ptr) })
+            .context("store_create_from_parts returned null")
     }
 
     /// This is a low level function that you shouldn't have to call unless you are developing the Nix bindings.
@@ -81,6 +124,9 @@ impl Drop for StorePath {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use hex_literal::hex;
+
     #[test]
     #[cfg(nix_at_least = "2.26" /* get_storedir */)]
     fn store_path_name() {
@@ -90,5 +136,19 @@ mod tests {
             format!("{store_dir}/rdd4pnr4x9rqc9wgbibhngv217w2xvxl-bash-interactive-5.2p26");
         let store_path = store.parse_store_path(store_path_string.as_str()).unwrap();
         assert_eq!(store_path.name().unwrap(), "bash-interactive-5.2p26");
+    }
+
+    #[test]
+    #[cfg(nix_at_least = "2.33")]
+    fn store_path_round_trip() {
+        let original_hash: [u8; STORE_PATH_HASH_SIZE] =
+            hex!("0123456789abcdef0011223344556677deadbeef");
+        let original_name = "foo.drv";
+
+        let store_path = StorePath::from_parts(&original_hash, original_name).unwrap();
+
+        // Round trip gets back what we started with
+        assert_eq!(store_path.hash().unwrap(), original_hash);
+        assert_eq!(store_path.name().unwrap(), original_name);
     }
 }

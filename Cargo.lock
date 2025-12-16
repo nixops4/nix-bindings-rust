@@ -133,6 +133,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
+name = "hex-literal"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
+
+[[package]]
 name = "home"
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -301,12 +307,14 @@ version = "0.2.1"
 dependencies = [
  "anyhow",
  "ctor",
+ "hex-literal",
  "lazy_static",
  "nix-bindings-store-sys",
  "nix-bindings-util",
  "nix-bindings-util-sys",
  "pkg-config",
  "tempfile",
+ "zerocopy",
 ]
 
 [[package]]
