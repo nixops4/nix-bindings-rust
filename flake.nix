@@ -108,7 +108,13 @@
           };
 
         /**
-          Adds flake checks that test the bindings with the provided nix package.
+          A flake-parts module for dependents to import. Also dogfooded locally
+          (extra, not required for normal CI).
+
+          Adds flake checks that test the nix-bindings crates with the
+          dependent's nix package.
+
+          See https://github.com/nixops4/nix-bindings-rust?tab=readme-ov-file#integration-with-nix-projects
         */
         flake-parts-modules.tested =
           # Consumer toplevel
@@ -146,9 +152,12 @@
               in
               {
                 key = "nix-bindings-rust-add-checks";
+                # Exclude clippy checks; those are part of this repo's local CI.
+                # This module is for dependents (and local dogfooding), which
+                # don't need to run clippy on nix-bindings-rust.
                 config.checks = lib.concatMapAttrs (
                   k: v:
-                  lib.optionalAttrs (lib.strings.hasPrefix "nix-bindings-" k) {
+                  lib.optionalAttrs (lib.strings.hasPrefix "nix-bindings-" k && !lib.strings.hasSuffix "-clippy" k) {
                     "dependency-${k}" = v;
                   }
                 ) nix-bindings-rust-perSystemConfig.config.checks;
