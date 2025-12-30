@@ -1,15 +1,23 @@
 use std::ptr::NonNull;
 
+#[cfg(nix_at_least = "2.33")]
+use anyhow::Context as AnyhowContext;
 use anyhow::Result;
-use nix_bindings_bindgen_raw as raw;
+use nix_bindings_store_sys as raw;
+#[cfg(nix_at_least = "2.33")]
+use nix_bindings_util::{check_call, context::Context};
 use nix_bindings_util::{
     result_string_init,
     string_return::{callback_get_result_string, callback_get_result_string_data},
 };
 
+/// The size of a store path hash in bytes (20 bytes, decoded from nix32).
+pub const STORE_PATH_HASH_SIZE: usize = 20;
+
 pub struct StorePath {
     raw: NonNull<raw::StorePath>,
 }
+
 impl StorePath {
     /// Get the name of the store path.
     ///
@@ -24,6 +32,43 @@ impl StorePath {
             );
             r
         }
+    }
+
+    /// Get the hash part of the store path.
+    ///
+    /// This returns the decoded hash (not the nix32-encoded string).
+    #[cfg(nix_at_least = "2.33")]
+    pub fn hash(&self) -> Result<[u8; STORE_PATH_HASH_SIZE]> {
+        let mut result = [0u8; STORE_PATH_HASH_SIZE];
+        let hash_part: &mut raw::store_path_hash_part = zerocopy::transmute_mut!(&mut result);
+
+        let mut ctx = Context::new();
+
+        unsafe {
+            check_call!(raw::store_path_hash(&mut ctx, self.as_ptr(), hash_part))?;
+        }
+        Ok(result)
+    }
+
+    /// Create a StorePath from hash and name components.
+    #[cfg(nix_at_least = "2.33")]
+    pub fn from_parts(hash: &[u8; STORE_PATH_HASH_SIZE], name: &str) -> Result<Self> {
+        let hash_part: &raw::store_path_hash_part = zerocopy::transmute_ref!(hash);
+
+        let mut ctx = Context::new();
+
+        let out_path = unsafe {
+            check_call!(raw::store_create_from_parts(
+                &mut ctx,
+                hash_part,
+                name.as_ptr() as *const i8,
+                name.len()
+            ))?
+        };
+
+        NonNull::new(out_path)
+            .map(|ptr| unsafe { Self::new_raw(ptr) })
+            .context("store_create_from_parts returned null")
     }
 
     /// This is a low level function that you shouldn't have to call unless you are developing the Nix bindings.
@@ -90,5 +135,23 @@ mod tests {
             format!("{store_dir}/rdd4pnr4x9rqc9wgbibhngv217w2xvxl-bash-interactive-5.2p26");
         let store_path = store.parse_store_path(store_path_string.as_str()).unwrap();
         assert_eq!(store_path.name().unwrap(), "bash-interactive-5.2p26");
+    }
+
+    #[test]
+    #[cfg(nix_at_least = "2.33")]
+    fn store_path_clone() {
+        use super::StorePath;
+        // Import TryFrom impls from the harmonia integration crate
+        use nix_bindings_store_harmonia as _;
+
+        let harmonia_path: harmonia_store_core::store_path::StorePath =
+            "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv".parse().unwrap();
+
+        let nix_path: StorePath = (&harmonia_path).try_into().unwrap();
+        let cloned_path = nix_path.clone();
+
+        // Verify both paths have the same name and hash
+        assert_eq!(nix_path.name().unwrap(), cloned_path.name().unwrap());
+        assert_eq!(nix_path.hash().unwrap(), cloned_path.hash().unwrap());
     }
 }

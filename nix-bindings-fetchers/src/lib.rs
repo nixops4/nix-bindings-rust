@@ -1,5 +1,5 @@
 use anyhow::{Context as _, Result};
-use nix_bindings_bindgen_raw as raw;
+use nix_bindings_fetchers_sys as raw;
 use nix_bindings_util::context::{self, Context};
 use std::ptr::NonNull;
 
