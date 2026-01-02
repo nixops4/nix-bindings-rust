@@ -134,11 +134,11 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "home"
-version = "0.5.11"
+version = "0.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "589533453244b0995c858700322199b2becb13b627df2851f64a2775d024abcf"
+checksum = "cc627f471c528ff0c4a49e1d5e60450c8f6461dd6d10ba9dcd3a61d3dff7728d"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.1",
 ]
 
 [[package]]
@@ -209,7 +209,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
-name = "nix-bindings-bindgen-raw"
+name = "nix-bindings-bdwgc-sys"
 version = "0.1.0"
 dependencies = [
  "bindgen",
@@ -224,10 +224,23 @@ dependencies = [
  "cstr",
  "ctor",
  "lazy_static",
- "nix-bindings-bindgen-raw",
+ "nix-bindings-bdwgc-sys",
+ "nix-bindings-expr-sys",
  "nix-bindings-store",
+ "nix-bindings-store-sys",
  "nix-bindings-util",
+ "nix-bindings-util-sys",
  "tempfile",
+]
+
+[[package]]
+name = "nix-bindings-expr-sys"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "nix-bindings-store-sys",
+ "nix-bindings-util-sys",
+ "pkg-config",
 ]
 
 [[package]]
@@ -237,10 +250,19 @@ dependencies = [
  "anyhow",
  "cstr",
  "ctor",
- "nix-bindings-bindgen-raw",
+ "nix-bindings-fetchers-sys",
  "nix-bindings-store",
  "nix-bindings-util",
  "tempfile",
+]
+
+[[package]]
+name = "nix-bindings-fetchers-sys"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "nix-bindings-util-sys",
+ "pkg-config",
 ]
 
 [[package]]
@@ -251,12 +273,25 @@ dependencies = [
  "cstr",
  "ctor",
  "lazy_static",
- "nix-bindings-bindgen-raw",
  "nix-bindings-expr",
  "nix-bindings-fetchers",
+ "nix-bindings-flake-sys",
  "nix-bindings-store",
  "nix-bindings-util",
  "tempfile",
+]
+
+[[package]]
+name = "nix-bindings-flake-sys"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "nix-bindings-bdwgc-sys",
+ "nix-bindings-expr-sys",
+ "nix-bindings-fetchers-sys",
+ "nix-bindings-store-sys",
+ "nix-bindings-util-sys",
+ "pkg-config",
 ]
 
 [[package]]
@@ -266,10 +301,20 @@ dependencies = [
  "anyhow",
  "ctor",
  "lazy_static",
- "nix-bindings-bindgen-raw",
+ "nix-bindings-store-sys",
  "nix-bindings-util",
+ "nix-bindings-util-sys",
  "pkg-config",
  "tempfile",
+]
+
+[[package]]
+name = "nix-bindings-store-sys"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "nix-bindings-util-sys",
+ "pkg-config",
 ]
 
 [[package]]
@@ -278,7 +323,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ctor",
- "nix-bindings-bindgen-raw",
+ "nix-bindings-util-sys",
+]
+
+[[package]]
+name = "nix-bindings-util-sys"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "pkg-config",
 ]
 
 [[package]]
