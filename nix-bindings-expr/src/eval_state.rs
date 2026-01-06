@@ -288,6 +288,15 @@ impl EvalStateBuilder {
 
         let mut context = Context::new();
 
+        // Load settings from global configuration (including readOnlyMode = false).
+        // This is necessary for path coercion to work (adding files to the store).
+        unsafe {
+            check_call!(raw::eval_state_builder_load(
+                &mut context,
+                self.eval_state_builder
+            ))?;
+        }
+
         // Note: these raw C string pointers borrow from self.lookup_path
         let mut lookup_path: Vec<*const c_char> = self
             .lookup_path
