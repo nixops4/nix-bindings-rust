@@ -2,6 +2,7 @@
 name = "nix-bindings-expr"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
 license = "LGPL-2.1"
 description = "Rust bindings to Nix expression evaluator"
 repository = "https://github.com/nixops4/nix-bindings-rust"
@@ -18,6 +19,10 @@ lazy_static = "1.4"
 ctor = "0.2"
 tempfile = "3.10"
 cstr = "0.2"
+
+[build-dependencies]
+pkg-config = "0.3"
+nix-bindings-util = { path = "../nix-bindings-util" }
 
 [lints.rust]
 warnings = "deny"
