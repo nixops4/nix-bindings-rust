@@ -250,6 +250,7 @@ impl Drop for EvalStateRef {
 pub struct EvalStateBuilder {
     eval_state_builder: *mut raw::eval_state_builder,
     lookup_path: Vec<CString>,
+    load_ambient_settings: bool,
     store: Store,
 }
 #[cfg(nix_at_least = "2.26")]
@@ -271,6 +272,7 @@ impl EvalStateBuilder {
             store,
             eval_state_builder,
             lookup_path: Vec::new(),
+            load_ambient_settings: true,
         })
     }
     /// Sets the [lookup path](https://nix.dev/manual/nix/latest/language/constructs/lookup-path.html) for Nix expression evaluation.
@@ -286,6 +288,15 @@ impl EvalStateBuilder {
         self.lookup_path = lookup_path;
         Ok(self)
     }
+    /// Sets whether to load settings from the ambient environment.
+    ///
+    /// When enabled (default), calls `nix_eval_state_builder_load` to load settings
+    /// from NIX_CONFIG and other environment variables. When disabled, only the
+    /// explicitly configured settings are used.
+    pub fn load_ambient_settings(mut self, load: bool) -> Self {
+        self.load_ambient_settings = load;
+        self
+    }
     /// Builds the configured [`EvalState`].
     pub fn build(&self) -> Result<EvalState> {
         // Make sure the library is initialized
@@ -295,11 +306,13 @@ impl EvalStateBuilder {
 
         // Load settings from global configuration (including readOnlyMode = false).
         // This is necessary for path coercion to work (adding files to the store).
-        unsafe {
-            check_call!(raw::eval_state_builder_load(
-                &mut context,
-                self.eval_state_builder
-            ))?;
+        if self.load_ambient_settings {
+            unsafe {
+                check_call!(raw::eval_state_builder_load(
+                    &mut context,
+                    self.eval_state_builder
+                ))?;
+            }
         }
 
         // Note: these raw C string pointers borrow from self.lookup_path
@@ -2742,6 +2755,9 @@ mod tests {
     ///   recursion fails at depth 1000
     /// - WITHOUT the fix: Settings aren't loaded, default max-call-depth=10000
     ///   is used, recursion of 1100 succeeds when it should fail
+    ///
+    /// Complementary to eval_state_builder_ignores_ambient_when_disabled which verifies
+    /// that ambient settings are NOT loaded when disabled.
     #[test]
     #[cfg(nix_at_least = "2.26")]
     fn eval_state_builder_loads_max_call_depth() {
@@ -2773,6 +2789,55 @@ mod tests {
                     panic!(
                         "Expected recursion to fail with max-call-depth=1000, but it succeeded. \
                          This indicates eval_state_builder_load() was not called."
+                    );
+                }
+            }
+        })
+        .unwrap();
+    }
+
+    /// Test that load_ambient_settings(false) ignores the ambient environment.
+    ///
+    /// The test suite sets max-call-depth = 1000 via NIX_CONFIG in setup().
+    /// When we disable loading ambient settings, this should be ignored and
+    /// the default max-call-depth = 10000 should be used instead.
+    ///
+    /// Complementary to eval_state_builder_loads_max_call_depth which verifies
+    /// that ambient settings ARE loaded when enabled.
+    #[test]
+    #[cfg(nix_at_least = "2.26")]
+    fn eval_state_builder_ignores_ambient_when_disabled() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalStateBuilder::new(store)
+                .unwrap()
+                .load_ambient_settings(false)
+                .build()
+                .unwrap();
+
+            // Create a recursive function that calls itself 1100 times
+            // With ambient settings disabled, default max-call-depth=10000 is used,
+            // so this should succeed (unlike eval_state_builder_loads_max_call_depth)
+            let expr = r#"
+                let
+                  recurse = n: if n == 0 then "done" else recurse (n - 1);
+                in
+                  recurse 1100
+            "#;
+
+            let result = es.eval_from_string(expr, "<test>");
+
+            match result {
+                Ok(value) => {
+                    // Success expected - ambient NIX_CONFIG was ignored
+                    let result_str = es.require_string(&value).unwrap();
+                    assert_eq!(result_str, "done");
+                }
+                Err(e) => {
+                    panic!(
+                        "Expected recursion to succeed with default max-call-depth=10000, \
+                         but it failed: {}. This indicates ambient settings were not ignored.",
+                        e
                     );
                 }
             }
