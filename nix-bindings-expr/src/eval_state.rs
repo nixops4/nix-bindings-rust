@@ -1255,6 +1255,12 @@ mod tests {
     #[ctor]
     fn setup() {
         test_init();
+
+        // Configure Nix settings for the test suite
+        // Set max-call-depth to 1000 (lower than default 10000) for the
+        // eval_state_builder_loads_max_call_depth test case, while
+        // giving other tests sufficient room for normal evaluation.
+        std::env::set_var("NIX_CONFIG", "max-call-depth = 1000");
     }
 
     /// Run a function while making sure that the current thread is registered with the GC.
@@ -2652,6 +2658,122 @@ mod tests {
                 Err(e) => {
                     let err_msg = e.to_string();
                     assert!(err_msg.contains("expected a list, but got a"));
+                }
+            }
+        })
+        .unwrap();
+    }
+
+    /// Test for path coercion fix (commit 8f6ec2e, <https://github.com/nixops4/nix-bindings-rust/pull/35>).
+    ///
+    /// This test verifies that path coercion works correctly with EvalStateBuilder.
+    /// Path coercion requires readOnlyMode = false, which is loaded from global
+    /// settings by calling eval_state_builder_load().
+    ///
+    /// # Background
+    ///
+    /// Without the eval_state_builder_load() call, settings from global Nix
+    /// configuration are never loaded, leaving readOnlyMode = true (the default).
+    /// This prevents Nix from adding paths to the store during evaluation,
+    /// which could cause errors like: "error: path '/some/local/path' does not exist"
+    ///
+    /// # Test Coverage
+    ///
+    /// This test exercises store file creation:
+    /// 1. builtins.toFile successfully creates files in the store
+    /// 2. Files are actually written to /nix/store
+    /// 3. Content is written correctly
+    ///
+    /// Note: This test may not reliably fail without the fix in all environments.
+    /// Use eval_state_builder_loads_max_call_depth for a deterministic test.
+    #[test]
+    #[cfg(nix_at_least = "2.26" /* real_path, eval_state_builder_load */)]
+    fn eval_state_builder_path_coercion() {
+        gc_registering_current_thread(|| {
+            let mut store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalStateBuilder::new(store.clone())
+                .unwrap()
+                .build()
+                .unwrap();
+
+            // Use builtins.toFile to create a file in the store.
+            // This operation requires readOnlyMode = false to succeed.
+            let expr = r#"builtins.toFile "test-file.txt" "test content""#;
+
+            // Evaluate the expression
+            let value = es.eval_from_string(expr, "<test>").unwrap();
+
+            // Realise the string to get the path and associated store paths
+            let realised = es.realise_string(&value, false).unwrap();
+
+            // Verify we got exactly one store path
+            assert_eq!(
+                realised.paths.len(),
+                1,
+                "Expected 1 store path, got {}",
+                realised.paths.len()
+            );
+
+            // Get the physical filesystem path for the store path
+            // In a relocated store, this differs from realised.s
+            let physical_path = store.real_path(&realised.paths[0]).unwrap();
+
+            // Verify the store path actually exists on disk
+            assert!(
+                std::path::Path::new(&physical_path).exists(),
+                "Store path should exist: {}",
+                physical_path
+            );
+
+            // Verify the content was written correctly
+            let store_content = std::fs::read_to_string(&physical_path).unwrap();
+            assert_eq!(store_content, "test content");
+        })
+        .unwrap();
+    }
+
+    /// Test that eval_state_builder_load() loads settings.
+    ///
+    /// Uses max-call-depth as the test setting. The test suite sets
+    /// max-call-depth = 1000 via NIX_CONFIG in setup() for the purpose of this test case.
+    /// This test creates a recursive function that calls itself 1100 times.
+    ///
+    /// - WITH the fix: Settings are loaded, max-call-depth=1000 is enforced,
+    ///   recursion fails at depth 1000
+    /// - WITHOUT the fix: Settings aren't loaded, default max-call-depth=10000
+    ///   is used, recursion of 1100 succeeds when it should fail
+    #[test]
+    #[cfg(nix_at_least = "2.26")]
+    fn eval_state_builder_loads_max_call_depth() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalStateBuilder::new(store).unwrap().build().unwrap();
+
+            // Create a recursive function that calls itself 1100 times
+            // This should fail because max-call-depth is 1000 (set in setup())
+            let expr = r#"
+                let
+                  recurse = n: if n == 0 then "done" else recurse (n - 1);
+                in
+                  recurse 1100
+            "#;
+
+            let result = es.eval_from_string(expr, "<test>");
+
+            match result {
+                Err(e) => {
+                    let err_str = e.to_string();
+                    assert!(
+                        err_str.contains("max-call-depth"),
+                        "Expected max-call-depth error, got: {}",
+                        err_str
+                    );
+                }
+                Ok(_) => {
+                    panic!(
+                        "Expected recursion to fail with max-call-depth=1000, but it succeeded. \
+                         This indicates eval_state_builder_load() was not called."
+                    );
                 }
             }
         })
