@@ -227,6 +227,7 @@ dependencies = [
  "nix-bindings-bindgen-raw",
  "nix-bindings-store",
  "nix-bindings-util",
+ "pkg-config",
  "tempfile",
 ]
 

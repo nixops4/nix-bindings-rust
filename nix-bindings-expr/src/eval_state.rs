@@ -224,6 +224,8 @@ impl Drop for EvalStateRef {
 /// Provides advanced configuration options for evaluation context setup.
 /// Use [`EvalState::new`] for simple cases or this builder for custom configuration.
 ///
+/// Requires Nix 2.26.0 or later.
+///
 /// # Examples
 ///
 /// ```rust
@@ -244,11 +246,13 @@ impl Drop for EvalStateRef {
 /// # Ok(())
 /// # }
 /// ```
+#[cfg(nix_at_least = "2.26")]
 pub struct EvalStateBuilder {
     eval_state_builder: *mut raw::eval_state_builder,
     lookup_path: Vec<CString>,
     store: Store,
 }
+#[cfg(nix_at_least = "2.26")]
 impl Drop for EvalStateBuilder {
     fn drop(&mut self) {
         unsafe {
@@ -256,6 +260,7 @@ impl Drop for EvalStateBuilder {
         }
     }
 }
+#[cfg(nix_at_least = "2.26")]
 impl EvalStateBuilder {
     /// Creates a new [`EvalStateBuilder`].
     pub fn new(store: Store) -> Result<EvalStateBuilder> {
