@@ -9,7 +9,7 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-nix-bindings-bindgen-raw = { path = "../nix-bindings-bindgen-raw" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys" }
 ctor = "0.2"
 
 [lints.rust]

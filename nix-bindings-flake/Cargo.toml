@@ -13,7 +13,7 @@ nix-bindings-expr = { path = "../nix-bindings-expr" }
 nix-bindings-fetchers = { path = "../nix-bindings-fetchers" }
 nix-bindings-store = { path = "../nix-bindings-store" }
 nix-bindings-util = { path = "../nix-bindings-util" }
-nix-bindings-bindgen-raw = { path = "../nix-bindings-bindgen-raw" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys" }
 lazy_static = "1.4"
 ctor = "0.2"
 tempfile = "3.10"

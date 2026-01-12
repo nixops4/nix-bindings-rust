@@ -1,7 +1,6 @@
 use std::{ffi::CString, os::raw::c_char, ptr::NonNull};
 
 use anyhow::{Context as _, Result};
-use nix_bindings_bindgen_raw as raw;
 use nix_bindings_expr::eval_state::EvalState;
 use nix_bindings_fetchers::FetchersSettings;
 use nix_bindings_util::{
@@ -9,6 +8,7 @@ use nix_bindings_util::{
     result_string_init,
     string_return::{callback_get_result_string, callback_get_result_string_data},
 };
+use nix_bindings_util_sys as raw;
 
 /// Store settings for the flakes feature.
 pub struct FlakeSettings {

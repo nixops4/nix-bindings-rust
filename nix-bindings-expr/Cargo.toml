@@ -11,7 +11,7 @@ path = "src/lib.rs"
 anyhow = "1.0"
 nix-bindings-store = { path = "../nix-bindings-store" }
 nix-bindings-util = { path = "../nix-bindings-util" }
-nix-bindings-bindgen-raw = { path = "../nix-bindings-bindgen-raw" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys" }
 lazy_static = "1.4"
 ctor = "0.2"
 tempfile = "3.10"

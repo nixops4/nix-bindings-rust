@@ -1,5 +1,5 @@
 [package]
-name = "nix-bindings-bindgen-raw"
+name = "nix-bindings-util-sys"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"

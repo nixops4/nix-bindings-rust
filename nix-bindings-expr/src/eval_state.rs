@@ -134,7 +134,6 @@ use anyhow::Context as _;
 use anyhow::{bail, Result};
 use cstr::cstr;
 use lazy_static::lazy_static;
-use nix_bindings_bindgen_raw as raw;
 use nix_bindings_store::path::StorePath;
 use nix_bindings_store::store::{Store, StoreWeak};
 use nix_bindings_util::context::Context;
@@ -142,6 +141,7 @@ use nix_bindings_util::string_return::{
     callback_get_result_string, callback_get_result_string_data,
 };
 use nix_bindings_util::{check_call, check_call_opt_key, result_string_init};
+use nix_bindings_util_sys as raw;
 use std::ffi::{c_char, CString};
 use std::iter::FromIterator;
 use std::os::raw::c_uint;
