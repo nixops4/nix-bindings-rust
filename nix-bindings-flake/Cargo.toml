@@ -9,11 +9,11 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-nix-bindings-expr = { path = "../nix-bindings-expr" }
-nix-bindings-fetchers = { path = "../nix-bindings-fetchers" }
-nix-bindings-store = { path = "../nix-bindings-store" }
-nix-bindings-util = { path = "../nix-bindings-util" }
-nix-bindings-util-sys = { path = "../nix-bindings-util-sys" }
+nix-bindings-expr = { path = "../nix-bindings-expr", version = "0.1.0" }
+nix-bindings-fetchers = { path = "../nix-bindings-fetchers", version = "0.1.0" }
+nix-bindings-store = { path = "../nix-bindings-store", version = "0.1.0" }
+nix-bindings-util = { path = "../nix-bindings-util", version = "0.1.0" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.1.0" }
 lazy_static = "1.4"
 ctor = "0.2"
 tempfile = "3.10"
