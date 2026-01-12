@@ -3,13 +3,15 @@ name = "nix-bindings-util"
 version = "0.1.0"
 edition = "2021"
 license = "LGPL-2.1"
+description = "Rust bindings to Nix utility library"
+repository = "https://github.com/nixops4/nix-bindings-rust"
 
 [lib]
 path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-nix-bindings-bindgen-raw = { path = "../nix-bindings-bindgen-raw" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.1.0" }
 ctor = "0.2"
 
 [lints.rust]

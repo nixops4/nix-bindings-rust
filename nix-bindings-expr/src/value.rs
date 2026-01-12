@@ -1,7 +1,7 @@
 pub mod __private;
 
-use nix_bindings_bindgen_raw as raw;
 use nix_bindings_util::{check_call, context::Context};
+use nix_bindings_util_sys as raw;
 use std::ptr::{null_mut, NonNull};
 
 // TODO: test: cloning a thunk does not duplicate the evaluation.
@@ -71,7 +71,7 @@ pub struct Value {
 impl Value {
     /// Take ownership of a new [`Value`].
     ///
-    /// This does not call [`nix_c_raw::gc_incref`], but does call [`nix_c_raw::nix_gc_decref`] when [dropped][`Drop`].
+    /// This does not call [`nix_bindings_util_sys::gc_incref`], but does call [`nix_bindings_util_sys::gc_decref`] when [dropped][`Drop`].
     ///
     /// # Safety
     ///
@@ -84,7 +84,7 @@ impl Value {
 
     /// Borrow a reference to a [`Value`].
     ///
-    /// This calls [`nix_c_raw::value_incref`], and the returned Value will call [`nix_c_raw::value_decref`] when dropped.
+    /// This calls [`nix_bindings_util_sys::value_incref`], and the returned Value will call [`nix_bindings_util_sys::value_decref`] when dropped.
     ///
     /// # Safety
     ///

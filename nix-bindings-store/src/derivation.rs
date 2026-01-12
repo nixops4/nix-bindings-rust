@@ -1,6 +1,6 @@
 #![cfg(nix_at_least = "2.33.0pre")]
 
-use nix_bindings_bindgen_raw as raw;
+use nix_bindings_util_sys as raw;
 use std::ptr::NonNull;
 
 /// A Nix derivation
