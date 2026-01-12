@@ -660,9 +660,9 @@ impl EvalState {
     ///
     /// Returns [`Err`] if evaluation failed or the value is not an attribute set.
     ///
-    /// Returns [`Ok(None)`] if the attribute is not present.
+    /// Returns `Ok(None)` if the attribute is not present.
     ///
-    /// Returns [`Ok(Some(value))`] if the attribute is present.
+    /// Returns `Ok(Some(value))` if the attribute is present.
     #[doc(alias = "nix_get_attr_byname")]
     #[doc(alias = "get_attr_byname")]
     #[doc(alias = "get_attr_opt")]
@@ -712,11 +712,11 @@ impl EvalState {
     /// Extracts an element from a [list][`ValueType::List`] Nix value by index.
     ///
     /// Forces [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) and verifies the value is a list.
-    /// Forces evaluation of the selected element, similar to [`require_attrs_select`].
+    /// Forces evaluation of the selected element, similar to [`Self::require_attrs_select`].
     ///
-    /// Returns [`Ok(Some(value))`] if the element is found.
+    /// Returns `Ok(Some(value))` if the element is found.
     ///
-    /// Returns [`Ok(None)`] if the index is out of bounds.
+    /// Returns `Ok(None)` if the index is out of bounds.
     ///
     /// Returns [`Err`] if evaluation failed, the element contains an error (e.g., `throw`), or the value is not a list.
     #[doc(alias = "get")]
@@ -908,7 +908,7 @@ impl EvalState {
     /// Applies a function to an argument and returns the result.
     ///
     /// Forces [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) of the function application.
-    /// For a lazy version, see [`new_value_apply`].
+    /// For a lazy version, see [`Self::new_value_apply`].
     #[doc(alias = "nix_value_call")]
     #[doc(alias = "value_call")]
     #[doc(alias = "apply")]
@@ -990,7 +990,7 @@ impl EvalState {
     /// Applies a function to an argument lazily, creating a [thunk](https://nix.dev/manual/nix/latest/language/evaluation.html#laziness).
     ///
     /// Does not force [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) of the function application.
-    /// For an eager version, see [`call`].
+    /// For an eager version, see [`Self::call`].
     #[doc(alias = "lazy_apply")]
     #[doc(alias = "thunk_apply")]
     #[doc(alias = "defer_call")]
@@ -1037,10 +1037,10 @@ impl EvalState {
         Ok(value)
     }
 
-    /// Creates a new [attribute set][`ValueType::Attrs`] Nix value from an iterator of name-value pairs.
+    /// Creates a new [attribute set][`ValueType::AttrSet`] Nix value from an iterator of name-value pairs.
     ///
     /// Accepts any iterator that yields `(String, Value)` pairs and has an exact size.
-    /// Common usage includes [`Vec`], [`HashMap`], and array literals.
+    /// Common usage includes [`Vec`], [`std::collections::HashMap`], and array literals.
     ///
     /// # Examples
     ///
