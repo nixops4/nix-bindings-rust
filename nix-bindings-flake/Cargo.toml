@@ -3,6 +3,8 @@ name = "nix-bindings-flake"
 version = "0.1.0"
 edition = "2021"
 license = "LGPL-2.1"
+description = "Rust bindings to Nix flakes"
+repository = "https://github.com/nixops4/nix-bindings-rust"
 
 [lib]
 path = "src/lib.rs"
