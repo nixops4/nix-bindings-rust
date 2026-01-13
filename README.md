@@ -12,7 +12,7 @@ This workspace provides multiple crates that wrap different layers of the Nix C 
 - **`nix-bindings-flake`** - Flake operations
 - **`nix-bindings-fetchers`** - Fetcher functionality (requires Nix ≥ 2.29)
 
-The `nix-bindings-util-sys` crate contains the generated FFI bindings and is not intended for direct use.
+The `*-sys` crates contain generated FFI bindings and are not intended for direct use.
 
 ## Features
 
@@ -211,6 +211,7 @@ For VSCode, load the dev shell via Nix Env Selector extension or direnv.
 
 ## Documentation
 
+- [Changelog](CHANGELOG.md)
 - [Nix C API Reference][C API]
 - [nix-cargo-integration][nix-cargo-integration]
 - [Hacking Guide](doc/hacking/test-ffi.md)

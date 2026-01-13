@@ -1,17 +1,18 @@
 [package]
 name = "nix-bindings-util"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "LGPL-2.1"
 description = "Rust bindings to Nix utility library"
 repository = "https://github.com/nixops4/nix-bindings-rust"
+readme = "README.md"
 
 [lib]
 path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.0" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.1" }
 
 [dev-dependencies]
 ctor = "0.2"

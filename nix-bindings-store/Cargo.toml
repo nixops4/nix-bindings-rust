@@ -1,20 +1,21 @@
 [package]
 name = "nix-bindings-store"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 build = "build.rs"
 license = "LGPL-2.1"
 description = "Rust bindings to Nix store library"
 repository = "https://github.com/nixops4/nix-bindings-rust"
+readme = "README.md"
 
 [lib]
 path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.0" }
-nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.0" }
-nix-bindings-store-sys = { path = "../nix-bindings-store-sys", version = "0.2.0" }
+nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.1" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.1" }
+nix-bindings-store-sys = { path = "../nix-bindings-store-sys", version = "0.2.1" }
 lazy_static = "1.4"
 
 [dev-dependencies]
@@ -24,7 +25,7 @@ tempfile = "3.10"
 [build-dependencies]
 pkg-config = "0.3"
 # Needed for version parsing in build.rs
-nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.0" }
+nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.1" }
 
 [lints.rust]
 warnings = "deny"
