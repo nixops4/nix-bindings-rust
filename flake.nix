@@ -28,11 +28,9 @@
           }:
           {
             _file = ./flake.nix;
+            imports = [ ./input-propagation-workaround.nix ];
             options.perSystem = flake-parts-lib.mkPerSystemOption (
-              { config, pkgs, ... }:
-              let
-                cfg = config.nix-bindings-rust;
-              in
+              { pkgs, ... }:
               {
                 options.nix-bindings-rust = {
                   nixPackage = lib.mkOption {
@@ -49,10 +47,21 @@
                       A module to load into your nix-cargo-integration
                       [`perSystem.nci.projects.<name>.depsDrvConfig`](https://flake.parts/options/nix-cargo-integration.html#opt-perSystem.nci.projects._name_.depsDrvConfig) or similar such options.
 
+                      This provides common build configuration (pkg-config, libclang, etc.) and
+                      automatically adds Nix C library build inputs based on which nix-bindings
+                      crates are *direct* dependencies of your crate.
+
+                      To disable automatic build input detection:
+                      ```nix
+                      nix-bindings-rust.inputPropagationWorkaround.enable = false;
+                      ```
+
                       Example:
                       ```nix
                       perSystem = perSystem@{ config, ... }: {
-                        nci.projects."my_project".depsDrvConfig = perSystem.config.nix-bindings-rust.nciBuildConfig;
+                        nci.projects."my_project".drvConfig = {
+                          imports = [ perSystem.config.nix-bindings-rust.nciBuildConfig ];
+                        };
                       }
                       ```
                     '';
@@ -64,22 +73,7 @@
                       buildInputs = [
                         # stdbool.h
                         pkgs.stdenv.cc
-                      ]
-                      ++ (
-                        if cfg.nixPackage ? libs then
-                          let
-                            l = cfg.nixPackage.libs;
-                          in
-                          [
-                            l.nix-expr-c
-                            l.nix-store-c
-                            l.nix-util-c
-                            l.nix-fetchers-c or null # Nix >= 2.29
-                            l.nix-flake-c
-                          ]
-                        else
-                          [ cfg.nixPackage ]
-                      );
+                      ];
                       nativeBuildInputs = [
                         pkgs.pkg-config
                       ];

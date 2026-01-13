@@ -1,9 +1,9 @@
 {
   perSystem =
-    {
-      config,
-      ...
-    }:
+    { config, ... }:
+    let
+      cfg = config.nix-bindings-rust;
+    in
     {
       # https://flake.parts/options/nix-cargo-integration
       nci.projects.nix-bindings = {
@@ -15,7 +15,7 @@
         drvConfig = {
           imports = [
             # Downstream projects import this into depsDrvConfig instead
-            config.nix-bindings-rust.nciBuildConfig
+            cfg.nciBuildConfig
           ];
           # Extra settings for running the tests
           mkDerivation = {
@@ -42,7 +42,7 @@
               echo "experimental-features = ca-derivations flakes" > "$NIX_CONF_DIR/nix.conf"
 
               # Init ahead of time, because concurrent initialization is flaky
-              ${config.nix-bindings-rust.nixPackage}/bin/nix-store --init
+              ${cfg.nixPackage}/bin/nix-store --init
 
               echo "Store initialized."
             '';

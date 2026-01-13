@@ -74,20 +74,20 @@ mod tests {
     fn setup() {
         let mut ctx = context::Context::new();
         unsafe {
-            check_call!(raw::libstore_init(&mut ctx)).unwrap();
+            check_call!(nix_bindings_util_sys::libutil_init(&mut ctx)).unwrap();
         }
     }
 
     #[test]
     fn set_get() {
         // Something that shouldn't matter if it's a different value temporarily
-        let key = "user-agent-suffix";
+        let key = "json-log-path";
 
         // Save the old value, in case it's important. Probably not.
         // If this doesn't work, pick a different setting to test with
         let old_value = get(key).unwrap();
 
-        let new_value = "just a string that we're storing into some option for testing purposes";
+        let new_value = "/just/a/path/that/we/are/storing/into/some/option/for/testing/purposes";
 
         let res_e = (|| {
             set(key, new_value)?;
