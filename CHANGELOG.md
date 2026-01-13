@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [0.2.0] - 2026-01-13
 
 ### Added
@@ -78,6 +80,7 @@ Thanks to everyone who contributed to the initial development, some of whom may 
 [#26]: https://github.com/nixops4/nix-bindings-rust/pull/26
 [#27]: https://github.com/nixops4/nix-bindings-rust/pull/27
 [#36]: https://github.com/nixops4/nix-bindings-rust/pull/36
+[Unreleased]: https://github.com/nixops4/nix-bindings-rust/compare/0.2.0...HEAD
 [0.2.0]: https://github.com/nixops4/nix-bindings-rust/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/nixops4/nix-bindings-rust/releases/tag/0.1.0
 [nix#11979]: https://github.com/NixOS/nix/issues/11979
