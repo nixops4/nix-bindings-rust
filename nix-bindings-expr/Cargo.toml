@@ -26,7 +26,7 @@ cstr = "0.2"
 
 [build-dependencies]
 pkg-config = "0.3"
-nix-bindings-util = { path = "../nix-bindings-util" }
+nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.0" }
 
 [lints.rust]
 warnings = "deny"
