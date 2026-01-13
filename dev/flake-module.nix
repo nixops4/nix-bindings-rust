@@ -122,5 +122,10 @@
       "dev" = { };
     };
   };
+  hercules-ci.cargo-publish = {
+    enable = true;
+    secretName = "crates-io";
+    assertVersions = true;
+  };
   flake = { };
 }

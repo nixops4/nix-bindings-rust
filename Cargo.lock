@@ -210,7 +210,7 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "nix-bindings-expr"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "cstr",
@@ -224,7 +224,7 @@ dependencies = [
 
 [[package]]
 name = "nix-bindings-fetchers"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "cstr",
@@ -237,7 +237,7 @@ dependencies = [
 
 [[package]]
 name = "nix-bindings-flake"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "cstr",
@@ -253,7 +253,7 @@ dependencies = [
 
 [[package]]
 name = "nix-bindings-store"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "ctor",
@@ -266,7 +266,7 @@ dependencies = [
 
 [[package]]
 name = "nix-bindings-util"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "ctor",
@@ -275,7 +275,7 @@ dependencies = [
 
 [[package]]
 name = "nix-bindings-util-sys"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bindgen",
  "pkg-config",

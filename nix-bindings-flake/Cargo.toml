@@ -1,6 +1,6 @@
 [package]
 name = "nix-bindings-flake"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "LGPL-2.1"
 description = "Rust bindings to Nix flakes"
@@ -11,11 +11,11 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-nix-bindings-expr = { path = "../nix-bindings-expr", version = "0.1.0" }
-nix-bindings-fetchers = { path = "../nix-bindings-fetchers", version = "0.1.0" }
-nix-bindings-store = { path = "../nix-bindings-store", version = "0.1.0" }
-nix-bindings-util = { path = "../nix-bindings-util", version = "0.1.0" }
-nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.1.0" }
+nix-bindings-expr = { path = "../nix-bindings-expr", version = "0.1.1" }
+nix-bindings-fetchers = { path = "../nix-bindings-fetchers", version = "0.1.1" }
+nix-bindings-store = { path = "../nix-bindings-store", version = "0.1.1" }
+nix-bindings-util = { path = "../nix-bindings-util", version = "0.1.1" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.1.1" }
 lazy_static = "1.4"
 ctor = "0.2"
 tempfile = "3.10"
