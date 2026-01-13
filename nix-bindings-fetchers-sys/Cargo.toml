@@ -1,6 +1,6 @@
 [package]
 name = "nix-bindings-fetchers-sys"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 build = "build.rs"
 license = "LGPL-2.1"
@@ -12,7 +12,7 @@ readme = "README.md"
 path = "src/lib.rs"
 
 [dependencies]
-nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.0" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.1" }
 
 [build-dependencies]
 bindgen = "0.69"
