@@ -28,6 +28,7 @@
           }:
           {
             _file = ./flake.nix;
+            imports = [ ./input-propagation-workaround.nix ];
             options.perSystem = flake-parts-lib.mkPerSystemOption (
               { pkgs, ... }:
               {
@@ -46,24 +47,20 @@
                       A module to load into your nix-cargo-integration
                       [`perSystem.nci.projects.<name>.depsDrvConfig`](https://flake.parts/options/nix-cargo-integration.html#opt-perSystem.nci.projects._name_.depsDrvConfig) or similar such options.
 
-                      This provides common build configuration (pkg-config, libclang, etc.) but you must
-                      add the specific Nix C libraries your crates need to `buildInputs`:
-                      - `nix-bindings-util-sys` needs `nix-util-c`
-                      - `nix-bindings-store-sys` needs `nix-store-c`
-                      - `nix-bindings-expr-sys` needs `nix-expr-c`
-                      - `nix-bindings-fetchers-sys` needs `nix-fetchers-c` (Nix >= 2.29)
-                      - `nix-bindings-flake-sys` needs `nix-flake-c`
-                      - `nix-bindings-bdwgc-sys` needs `boehmgc`
+                      This provides common build configuration (pkg-config, libclang, etc.) and
+                      automatically adds Nix C library build inputs based on which nix-bindings
+                      crates are *direct* dependencies of your crate.
+
+                      To disable automatic build input detection:
+                      ```nix
+                      nix-bindings-rust.inputPropagationWorkaround.enable = false;
+                      ```
 
                       Example:
                       ```nix
-                      perSystem = perSystem@{ config, pkgs, ... }: {
-                        nci.projects."my_project".depsDrvConfig = {
+                      perSystem = perSystem@{ config, ... }: {
+                        nci.projects."my_project".drvConfig = {
                           imports = [ perSystem.config.nix-bindings-rust.nciBuildConfig ];
-                          mkDerivation.buildInputs = [
-                            perSystem.config.nix-bindings-rust.nixPackage.libs.nix-store-c
-                            # ... add other libs as needed
-                          ];
                         };
                       }
                       ```
