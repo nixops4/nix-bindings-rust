@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "nix-bindings-bindgen-raw",
+    "nix-bindings-util-sys",
     "nix-bindings-expr",
     "nix-bindings-fetchers",
     "nix-bindings-flake",

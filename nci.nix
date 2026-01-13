@@ -8,6 +8,10 @@
       # https://flake.parts/options/nix-cargo-integration
       nci.projects.nix-bindings = {
         path = ./.;
+        profiles = {
+          dev.drvConfig.env.RUSTFLAGS = "-D warnings";
+          release.runTests = true;
+        };
         drvConfig = {
           imports = [
             # Downstream projects import this into depsDrvConfig instead

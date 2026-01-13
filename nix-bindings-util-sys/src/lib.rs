@@ -7,10 +7,19 @@
 //! Normally you don't have to use this crate directly.
 //! Instead use `nix-store` and `nix-expr`.
 
+// This file must only contain generated code, so that the module-level
+// #![allow(...)] attributes don't suppress warnings in hand-written code.
+// If you need to add hand-written code, use a submodule to isolate the
+// generated code. See:
+// https://github.com/nixops4/nixops4/pull/138/commits/330c3881be3d3cf3e59adebbe0ab1c0f15f6d2c9
+
 // Standard bindgen suppressions for C naming conventions
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+// Clippy suppressions for generated C bindings
+// bindgen doesn't generate safety docs
+#![allow(clippy::missing_safety_doc)]
 // Rustdoc suppressions for generated C documentation
 // The C headers contain Doxygen-style documentation that doesn't translate
 // well to Rust's rustdoc format, causing various warnings:

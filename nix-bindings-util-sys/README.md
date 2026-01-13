@@ -1,4 +1,4 @@
-# nix-bindings-bindgen-raw
+# nix-bindings-util-sys
 
 This crate contains generated bindings for the Nix C API.
 **You should not have to use this crate directly,** and so you should probably not add it to your dependencies.

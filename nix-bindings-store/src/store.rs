@@ -1,11 +1,11 @@
 use anyhow::{bail, Error, Result};
 use lazy_static::lazy_static;
-use nix_bindings_bindgen_raw as raw;
 use nix_bindings_util::context::Context;
 use nix_bindings_util::string_return::{
     callback_get_result_string, callback_get_result_string_data,
 };
 use nix_bindings_util::{check_call, result_string_init};
+use nix_bindings_util_sys as raw;
 #[cfg(nix_at_least = "2.33.0pre")]
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -101,7 +101,7 @@ pub struct Store {
 impl Store {
     /// Open a store.
     ///
-    /// See [nix_c_raw::store_open] for more information.
+    /// See [`nix_bindings_util_sys::store_open`] for more information.
     #[doc(alias = "nix_store_open")]
     pub fn open<'a, 'b>(
         url: Option<&str>,
