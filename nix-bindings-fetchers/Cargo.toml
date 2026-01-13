@@ -5,6 +5,7 @@ edition = "2021"
 license = "LGPL-2.1"
 description = "Rust bindings to Nix fetchers"
 repository = "https://github.com/nixops4/nix-bindings-rust"
+readme = "README.md"
 
 [lib]
 path = "src/lib.rs"

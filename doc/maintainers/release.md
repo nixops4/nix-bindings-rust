@@ -1,8 +1,17 @@
-
 # Release process
 
 This project uses simple tags, that trigger a release of all crates using Hercules CI.
 See [HCI Effects cargo publish workflow].
+
+## Before tagging
+
+- Update `CHANGELOG.md`:
+  - Make sure the Unreleased section is up to date
+  - Change it to the new version and release date
+
+## After tagging
+
+- Add a new Unreleased section to `CHANGELOG.md`
 
 Dissatisfied with the coarse grained release process? Complain to @roberth and he'll get it done for you.
 
