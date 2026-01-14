@@ -5,7 +5,7 @@
 //! and documentation comments that don't always conform to Rust standards.
 //!
 //! Normally you don't have to use this crate directly.
-//! Instead use `nix-store` and `nix-expr`.
+//! Instead use `nix-util`.
 
 // This file must only contain generated code, so that the module-level
 // #![allow(...)] attributes don't suppress warnings in hand-written code.

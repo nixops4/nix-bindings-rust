@@ -102,7 +102,7 @@ pub struct Store {
 impl Store {
     /// Open a store.
     ///
-    /// See [`nix_bindings_util_sys::store_open`] for more information.
+    /// See [`nix_bindings_store_sys::store_open`] for more information.
     #[doc(alias = "nix_store_open")]
     pub fn open<'a, 'b>(
         url: Option<&str>,
