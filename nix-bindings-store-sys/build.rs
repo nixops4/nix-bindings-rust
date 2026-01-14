@@ -9,6 +9,22 @@ impl bindgen::callbacks::ParseCallbacks for StripNixPrefix {
     }
 }
 
+#[derive(Debug)]
+struct AddZerocopyDerives {}
+impl bindgen::callbacks::ParseCallbacks for AddZerocopyDerives {
+    fn add_derives(&self, info: &bindgen::callbacks::DeriveInfo<'_>) -> Vec<String> {
+        if info.name == "store_path_hash_part" {
+            vec![
+                "zerocopy::FromBytes".to_string(),
+                "zerocopy::IntoBytes".to_string(),
+                "zerocopy::Immutable".to_string(),
+            ]
+        } else {
+            vec![]
+        }
+    }
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=include/nix-c-store.h");
     println!("cargo:rustc-link-lib=nixstorec");
@@ -29,6 +45,7 @@ fn main() {
         .clang_args(args)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .parse_callbacks(Box::new(StripNixPrefix))
+        .parse_callbacks(Box::new(AddZerocopyDerives {}))
         // Blocklist symbols from nix-bindings-util-sys
         .blocklist_file(".*nix_api_util\\.h")
         .generate()

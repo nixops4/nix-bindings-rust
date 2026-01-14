@@ -17,9 +17,11 @@ nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.1" }
 nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.1" }
 nix-bindings-store-sys = { path = "../nix-bindings-store-sys", version = "0.2.1" }
 lazy_static = "1.4"
+zerocopy = "0.8"
 
 [dev-dependencies]
 ctor = "0.2"
+hex-literal = "0.4"
 tempfile = "3.10"
 
 [build-dependencies]

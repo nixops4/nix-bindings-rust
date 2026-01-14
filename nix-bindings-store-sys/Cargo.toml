@@ -13,6 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.1" }
+zerocopy = { version = "0.8", features = ["derive"] }
 
 [build-dependencies]
 bindgen = "0.69"
