@@ -12,6 +12,9 @@ use nix_bindings_util::{
 /// The size of a store path hash in bytes (20 bytes, decoded from nix32).
 pub const STORE_PATH_HASH_SIZE: usize = 20;
 
+#[cfg(nix_at_least = "2.33")]
+const _: () = assert!(std::mem::size_of::<raw::store_path_hash_part>() == STORE_PATH_HASH_SIZE);
+
 pub struct StorePath {
     raw: NonNull<raw::StorePath>,
 }
