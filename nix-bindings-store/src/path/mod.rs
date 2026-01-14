@@ -125,6 +125,9 @@ impl Drop for StorePath {
     }
 }
 
+#[cfg(all(feature = "harmonia", nix_at_least = "2.33"))]
+mod harmonia;
+
 #[cfg(test)]
 mod tests {
     use super::*;
