@@ -65,6 +65,21 @@ impl ValueType {
 }
 
 /// A pointer to a [value](https://nix.dev/manual/nix/latest/language/types.html) or [thunk](https://nix.dev/manual/nix/2.31/language/evaluation.html?highlight=thunk#laziness), to be used with [`EvalState`][`crate::eval_state::EvalState`] methods.
+///
+/// # Shared Evaluation State
+///
+/// Multiple `Value` instances can reference the same underlying Nix value.
+/// This occurs when a `Value` is [cloned](Clone), or when multiple Nix
+/// expressions reference the same binding.
+///
+/// When any reference to a thunk is evaluated—whether through
+/// [`force`](crate::eval_state::EvalState::force), other `EvalState` methods,
+/// or indirectly as a consequence of evaluating something else—all references
+/// observe the evaluated result. This means
+/// [`value_type_unforced`](crate::eval_state::EvalState::value_type_unforced)
+/// can return `None` (thunk) initially but a specific type later, even without
+/// directly operating on that `Value`. The state will not regress back to a
+/// less determined state.
 pub struct Value {
     inner: NonNull<raw::Value>,
 }
