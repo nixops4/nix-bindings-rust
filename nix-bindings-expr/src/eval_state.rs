@@ -442,6 +442,8 @@ impl EvalState {
     /// Converts [thunks](https://nix.dev/manual/nix/latest/language/evaluation.html#laziness) to their evaluated form. Does not modify already-evaluated values.
     ///
     /// Does not perform deep evaluation of nested structures.
+    ///
+    /// See also: [Shared Evaluation State](Value#shared-evaluation-state)
     #[doc(alias = "evaluate")]
     #[doc(alias = "strict")]
     pub fn force(&mut self, v: &Value) -> Result<()> {
@@ -460,6 +462,8 @@ impl EvalState {
     /// Returns [`None`] if the value is an unevaluated [thunk](https://nix.dev/manual/nix/latest/language/evaluation.html#laziness).
     ///
     /// Returns [`Some`] if the value is already evaluated.
+    ///
+    /// See also: [Shared Evaluation State](Value#shared-evaluation-state)
     #[doc(alias = "type_of")]
     #[doc(alias = "value_type_lazy")]
     #[doc(alias = "nix_get_type")]
