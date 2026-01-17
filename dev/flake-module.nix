@@ -81,7 +81,6 @@
           config.packages.nix
         ];
         nativeBuildInputs = [
-          pkgs.pre-commit
           config.treefmt.build.wrapper
 
           pkgs.rust-analyzer
@@ -98,7 +97,7 @@
           # pkgs.cargo-valgrind
         ];
         shellHook = ''
-          ${config.pre-commit.installationScript}
+          ${config.pre-commit.shellHook}
           echo 1>&2 "Welcome to the development shell!"
         '';
         # rust-analyzer needs a NIX_PATH for some reason
