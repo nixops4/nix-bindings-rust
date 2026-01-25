@@ -1,6 +1,13 @@
 #![cfg(nix_at_least = "2.33.0pre")]
 
 use nix_bindings_store_sys as raw;
+#[cfg(nix_at_least = "2.33")]
+use nix_bindings_util::{
+    check_call,
+    context::Context,
+    result_string_init,
+    string_return::{callback_get_result_string, callback_get_result_string_data},
+};
 use std::ptr::NonNull;
 
 /// A Nix derivation
@@ -13,6 +20,28 @@ pub struct Derivation {
 impl Derivation {
     pub(crate) fn new_raw(inner: NonNull<raw::derivation>) -> Self {
         Derivation { inner }
+    }
+
+    /// Convert the derivation to JSON (which is encoded to a string).
+    ///
+    /// **Requires Nix 2.33 or later.**
+    ///
+    /// The JSON format follows the [Nix derivation JSON schema](https://nix.dev/manual/nix/latest/protocols/json/derivation.html).
+    /// Note that this format is experimental as of writing.
+    #[cfg(nix_at_least = "2.33")]
+    pub fn to_json_string(&self) -> anyhow::Result<String> {
+        let mut ctx = Context::new();
+
+        unsafe {
+            let mut r = result_string_init!();
+            check_call!(raw::derivation_to_json(
+                &mut ctx,
+                self.inner.as_ptr(),
+                Some(callback_get_result_string),
+                callback_get_result_string_data(&mut r)
+            ))?;
+            r
+        }
     }
 
     /// This is a low level function that you shouldn't have to call unless you are developing the Nix bindings.
