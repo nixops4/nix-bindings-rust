@@ -49,5 +49,24 @@
           };
         };
       };
+      nci.crates.nix-bindings-store =
+        let
+          addHarmoniaProfile = ''
+            cat >> Cargo.toml <<'EOF'
+
+            [profile.harmonia]
+            inherits = "release"
+            EOF
+          '';
+        in
+        {
+          profiles.harmonia = {
+            features = [ "harmonia" ];
+            runTests = true;
+            # Add harmonia profile to Cargo.toml for both deps and main builds
+            depsDrvConfig.mkDerivation.postPatch = addHarmoniaProfile;
+            drvConfig.mkDerivation.postPatch = addHarmoniaProfile;
+          };
+        };
     };
 }
