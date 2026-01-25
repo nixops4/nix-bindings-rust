@@ -84,3 +84,9 @@ impl Drop for Derivation {
         }
     }
 }
+
+#[cfg(feature = "harmonia")]
+mod harmonia;
+
+#[cfg(test)]
+mod tests {}
