@@ -84,7 +84,7 @@
           config.treefmt.build.wrapper
 
           pkgs.rust-analyzer
-          pkgs.nixfmt-rfc-style
+          pkgs.nixfmt
           pkgs.rustfmt
           pkgs.pkg-config
           pkgs.clang-tools # clangd
