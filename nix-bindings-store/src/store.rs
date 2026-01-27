@@ -1,5 +1,4 @@
 use anyhow::{bail, Error, Result};
-use lazy_static::lazy_static;
 use nix_bindings_store_sys as raw;
 use nix_bindings_util::context::Context;
 use nix_bindings_util::string_return::{
@@ -13,19 +12,17 @@ use std::collections::HashMap;
 use std::ffi::{c_char, CString};
 use std::ptr::null_mut;
 use std::ptr::NonNull;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, LazyLock, Mutex, Weak};
 
 #[cfg(nix_at_least = "2.33.0pre")]
 use crate::derivation::Derivation;
 use crate::path::StorePath;
 
 /* TODO make Nix itself thread safe */
-lazy_static! {
-    static ref INIT: Result<()> = unsafe {
-        check_call!(raw::libstore_init(&mut Context::new()))?;
-        Ok(())
-    };
-}
+static INIT: LazyLock<Result<()>> = LazyLock::new(|| unsafe {
+    check_call!(raw::libstore_init(&mut Context::new()))?;
+    Ok(())
+});
 
 struct StoreRef {
     inner: NonNull<raw::Store>,
@@ -68,9 +65,8 @@ impl StoreWeak {
 /// Protects against https://github.com/NixOS/nix/issues/11979 (unless different parameters are passed, in which case it's up to luck, but you do get your own parameters as you asked for).
 type StoreCacheMap = HashMap<(Option<String>, Vec<(String, String)>), StoreWeak>;
 
-lazy_static! {
-    static ref STORE_CACHE: Arc<Mutex<StoreCacheMap>> = Arc::new(Mutex::new(HashMap::new()));
-}
+static STORE_CACHE: LazyLock<Arc<Mutex<StoreCacheMap>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 #[cfg(nix_at_least = "2.33.0pre")]
 unsafe extern "C" fn callback_get_result_store_path_set(

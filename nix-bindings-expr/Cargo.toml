@@ -19,7 +19,6 @@ nix-bindings-bdwgc-sys = { path = "../nix-bindings-bdwgc-sys", version = "0.2.1"
 nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.1" }
 nix-bindings-store-sys = { path = "../nix-bindings-store-sys", version = "0.2.1" }
 nix-bindings-expr-sys = { path = "../nix-bindings-expr-sys", version = "0.2.1" }
-lazy_static = "1.4"
 ctor = "0.2"
 tempfile = "3.10"
 cstr = "0.2"
