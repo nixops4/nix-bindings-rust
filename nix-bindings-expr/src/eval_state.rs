@@ -908,9 +908,9 @@ impl EvalState {
         }?;
 
         let s = unsafe {
-            let start = raw::realised_string_get_buffer_start(rs) as *const u8;
+            let start = raw::realised_string_get_buffer_start(rs) as *const std::os::raw::c_char;
             let size = raw::realised_string_get_buffer_size(rs);
-            let slice = std::slice::from_raw_parts(start, size);
+            let slice = std::slice::from_raw_parts(start.cast::<u8>(), size);
             String::from_utf8(slice.to_vec())
                 .map_err(|e| anyhow::format_err!("Nix string is not valid UTF-8: {}", e))?
         };
