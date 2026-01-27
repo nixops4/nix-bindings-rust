@@ -4,18 +4,16 @@
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";
     nix.url = "github:DeterminateSystems/nix-src";
-    nix.inputs.nixpkgs.follows = "nixpkgs";
-    nix-cargo-integration.url = "github:yusdacra/nix-cargo-integration";
+    nix-cargo-integration.url = "github:90-008/nix-cargo-integration";
     nix-cargo-integration.inputs.nixpkgs.follows = "nixpkgs";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
   outputs =
-    inputs@{ self, flake-parts, ... }:
+    inputs@{ flake-parts, ... }:
     flake-parts.lib.mkFlake { inherit inputs; } (
       toplevel@{
         lib,
-        withSystem,
         ...
       }:
       let
@@ -24,18 +22,14 @@
         */
         flake-parts-modules.basic =
           {
-            config,
             flake-parts-lib,
-            withSystem,
             ...
           }:
           {
             _file = ./flake.nix;
+            imports = [ ./input-propagation-workaround.nix ];
             options.perSystem = flake-parts-lib.mkPerSystemOption (
-              { config, pkgs, ... }:
-              let
-                cfg = config.nix-bindings-rust;
-              in
+              { pkgs, ... }:
               {
                 options.nix-bindings-rust = {
                   nixPackage = lib.mkOption {
@@ -52,10 +46,21 @@
                       A module to load into your nix-cargo-integration
                       [`perSystem.nci.projects.<name>.depsDrvConfig`](https://flake.parts/options/nix-cargo-integration.html#opt-perSystem.nci.projects._name_.depsDrvConfig) or similar such options.
 
+                      This provides common build configuration (pkg-config, libclang, etc.) and
+                      automatically adds Nix C library build inputs based on which nix-bindings
+                      crates are *direct* dependencies of your crate.
+
+                      To disable automatic build input detection:
+                      ```nix
+                      nix-bindings-rust.inputPropagationWorkaround.enable = false;
+                      ```
+
                       Example:
                       ```nix
                       perSystem = perSystem@{ config, ... }: {
-                        nci.projects."my_project".depsDrvConfig = perSystem.config.nix-bindings-rust.nciBuildConfig;
+                        nci.projects."my_project".drvConfig = {
+                          imports = [ perSystem.config.nix-bindings-rust.nciBuildConfig ];
+                        };
                       }
                       ```
                     '';
@@ -63,26 +68,11 @@
                 };
                 config.nix-bindings-rust = {
                   nciBuildConfig = {
-                    mkDerivation = {
+                    mkDerivation = rec {
                       buildInputs = [
                         # stdbool.h
                         pkgs.stdenv.cc
-                      ]
-                      ++ (
-                        if cfg.nixPackage ? libs then
-                          let
-                            l = cfg.nixPackage.libs;
-                          in
-                          [
-                            l.nix-expr-c
-                            l.nix-store-c
-                            l.nix-util-c
-                            l.nix-fetchers-c or null # Nix >= 2.29
-                            l.nix-flake-c
-                          ]
-                        else
-                          [ cfg.nixPackage ]
-                      );
+                      ];
                       nativeBuildInputs = [
                         pkgs.pkg-config
                       ];
@@ -91,6 +81,7 @@
                       postConfigure = lib.optionalString pkgs.stdenv.cc.isGNU ''
                         source ${./bindgen-gcc.sh}
                       '';
+                      shellHook = postConfigure;
                     };
                     # NOTE: duplicated in flake.nix devShell
                     env = {
@@ -110,17 +101,23 @@
           };
 
         /**
-          Adds flake checks that test the bindings with the provided nix package.
+          A flake-parts module for dependents to import. Also dogfooded locally
+          (extra, not required for normal CI).
+
+          Adds flake checks that test the nix-bindings crates with the
+          dependent's nix package.
+
+          See https://github.com/nixops4/nix-bindings-rust?tab=readme-ov-file#integration-with-nix-projects
         */
         flake-parts-modules.tested =
           # Consumer toplevel
-          { options, config, ... }:
+          { ... }:
           {
             _file = ./flake.nix;
             imports = [ flake-parts-modules.basic ];
             config.perSystem =
               # Consumer perSystem
-              consumerPerSystem@{
+              {
                 lib,
                 config,
                 system,
@@ -138,9 +135,9 @@
                         {
                           config = {
                             # Overriding our `perSystem` to use the consumer's `pkgs`
-                            _module.args.pkgs = lib.mkForce consumerPerSystem.pkgs;
+                            _module.args.pkgs = lib.mkForce pkgs;
                             # ... and `nixPackage`
-                            nix-bindings-rust.nixPackage = lib.mkForce consumerPerSystem.config.nix-bindings-rust.nixPackage;
+                            nix-bindings-rust.nixPackage = lib.mkForce config.nix-bindings-rust.nixPackage;
                           };
                         }
                       ];
@@ -148,6 +145,9 @@
               in
               {
                 key = "nix-bindings-rust-add-checks";
+                # Exclude clippy checks; those are part of this repo's local CI.
+                # This module is for dependents (and local dogfooding), which
+                # don't need to run clippy on nix-bindings-rust.
                 config.checks = lib.concatMapAttrs (
                   k: v:
                   lib.optionalAttrs (lib.strings.hasPrefix "nix-bindings-" k && !lib.strings.hasSuffix "-clippy" k) {
@@ -177,10 +177,7 @@
         ];
         perSystem =
           {
-            config,
-            self',
             inputs',
-            pkgs,
             ...
           }:
           {

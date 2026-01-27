@@ -1,13 +1,27 @@
 [package]
 name = "nix-bindings-util"
-version = "0.1.0"
+version = "0.2.1"
 edition = "2021"
 license = "LGPL-2.1"
+description = "Rust bindings to Nix utility library"
+repository = "https://github.com/nixops4/nix-bindings-rust"
+readme = "README.md"
 
 [lib]
 path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-nix-bindings-bindgen-raw = { path = "../nix-bindings-bindgen-raw" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.1" }
+
+[dev-dependencies]
 ctor = "0.2"
+
+[lints.rust]
+warnings = "deny"
+dead-code = "allow"
+
+[lints.clippy]
+type-complexity = "allow"
+# We're still trying to make Nix more thread-safe, want forward-compat
+arc-with-non-send-sync = "allow"

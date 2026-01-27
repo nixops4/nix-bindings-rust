@@ -11,12 +11,12 @@ impl bindgen::callbacks::ParseCallbacks for StripNixPrefix {
 
 fn main() {
     // Tell cargo to invalidate the built crate whenever the wrapper changes
-    println!("cargo:rerun-if-changed=include/nix-c-raw.h");
-    println!("cargo:rustc-link-lib=nixflake");
+    println!("cargo:rerun-if-changed=include/nix-c-util.h");
+    println!("cargo:rustc-link-lib=nixutil");
 
     // https://rust-lang.github.io/rust-bindgen/library-usage.html
     let bindings = bindgen::Builder::default()
-        .header("include/nix-c-raw.h")
+        .header("include/nix-c-util.h")
         // Find the includes
         .clang_args(c_headers())
         // Tell cargo to invalidate the built crate whenever any of the
@@ -38,15 +38,7 @@ fn main() {
 fn c_headers() -> Vec<String> {
     let mut args = Vec::new();
     // args.push("-isystem".to_string());
-    for path in pkg_config::probe_library("nix-flake-c")
-        .unwrap()
-        .include_paths
-        .iter()
-    {
-        args.push(format!("-I{}", path.to_str().unwrap()));
-    }
-
-    for path in pkg_config::probe_library("bdw-gc")
+    for path in pkg_config::probe_library("nix-util-c")
         .unwrap()
         .include_paths
         .iter()

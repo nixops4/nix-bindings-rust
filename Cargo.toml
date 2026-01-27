@@ -1,6 +1,11 @@
 [workspace]
 members = [
-    "nix-bindings-bindgen-raw",
+    "nix-bindings-bdwgc-sys",
+    "nix-bindings-util-sys",
+    "nix-bindings-store-sys",
+    "nix-bindings-expr-sys",
+    "nix-bindings-fetchers-sys",
+    "nix-bindings-flake-sys",
     "nix-bindings-expr",
     "nix-bindings-fetchers",
     "nix-bindings-flake",
@@ -8,3 +13,12 @@ members = [
     "nix-bindings-util",
 ]
 resolver = "2"
+
+[workspace.lints.rust]
+warnings = "deny"
+dead-code = "allow"
+
+[workspace.lints.clippy]
+type-complexity = "allow"
+# We're still trying to make Nix more thread-safe, want forward-compat
+arc-with-non-send-sync = "allow"

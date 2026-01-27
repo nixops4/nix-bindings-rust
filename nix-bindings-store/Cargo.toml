@@ -1,22 +1,45 @@
 [package]
 name = "nix-bindings-store"
-version = "0.1.0"
+version = "0.2.1"
 edition = "2021"
 build = "build.rs"
 license = "LGPL-2.1"
+description = "Rust bindings to Nix store library"
+repository = "https://github.com/nixops4/nix-bindings-rust"
+readme = "README.md"
 
 [lib]
 path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0"
-nix-bindings-util = { path = "../nix-bindings-util" }
-nix-bindings-bindgen-raw = { path = "../nix-bindings-bindgen-raw" }
+nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.1" }
+nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.1" }
+nix-bindings-store-sys = { path = "../nix-bindings-store-sys", version = "0.2.1" }
 lazy_static = "1.4"
+zerocopy = "0.8"
+harmonia-store-core = { version = "0.0.0-alpha.0", optional = true }
+serde_json = { version = "1.0", optional = true }
 
 [dev-dependencies]
 ctor = "0.2"
+hex-literal = "0.4"
 tempfile = "3.10"
+serde_json = "1.0"
 
 [build-dependencies]
 pkg-config = "0.3"
+# Needed for version parsing in build.rs
+nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.1" }
+
+[features]
+harmonia = [ "dep:harmonia-store-core", "dep:serde_json" ]
+
+[lints.rust]
+warnings = "deny"
+dead-code = "allow"
+
+[lints.clippy]
+type-complexity = "allow"
+# We're still trying to make Nix more thread-safe, want forward-compat
+arc-with-non-send-sync = "allow"

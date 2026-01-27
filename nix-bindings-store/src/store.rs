@@ -1,12 +1,15 @@
 use anyhow::{bail, Error, Result};
 use lazy_static::lazy_static;
-use nix_bindings_bindgen_raw as raw;
+use nix_bindings_store_sys as raw;
 use nix_bindings_util::context::Context;
-use nix_bindings_util::string_return::{callback_get_result_string, callback_get_result_string_data};
+use nix_bindings_util::string_return::{
+    callback_get_result_string, callback_get_result_string_data,
+};
 use nix_bindings_util::{check_call, result_string_init};
-use std::collections::HashMap;
+use nix_bindings_util_sys as raw_util;
 #[cfg(nix_at_least = "2.31")]
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::ffi::{c_char, CStr, CString};
 use std::ptr::null_mut;
 use std::ptr::NonNull;
@@ -71,7 +74,7 @@ lazy_static! {
 
 #[cfg(nix_at_least = "2.31")]
 unsafe extern "C" fn callback_get_result_store_path_set(
-    _context: *mut raw::c_context,
+    _context: *mut raw_util::c_context,
     user_data: *mut std::os::raw::c_void,
     store_path: *const raw::StorePath,
 ) {
@@ -144,7 +147,7 @@ pub struct Store {
 impl Store {
     /// Open a store.
     ///
-    /// See [nix_c_raw::store_open] for more information.
+    /// See [`nix_bindings_store_sys::store_open`] for more information.
     #[doc(alias = "nix_store_open")]
     pub fn open<'a, 'b>(
         url: Option<&str>,
@@ -354,8 +357,8 @@ impl Store {
                 self.inner.ptr(),
                 drv.inner.as_ptr()
             ))?;
-            let path = NonNull::new(path)
-                .ok_or_else(|| Error::msg("add_derivation returned null"))?;
+            let path =
+                NonNull::new(path).ok_or_else(|| Error::msg("add_derivation returned null"))?;
             Ok(StorePath::new_raw(path))
         }
     }
@@ -394,7 +397,8 @@ impl Store {
     #[doc(alias = "nix_store_realise")]
     pub fn realise(&mut self, path: &StorePath) -> Result<BTreeMap<String, StorePath>> {
         let mut outputs = BTreeMap::new();
-        let userdata = &mut outputs as *mut BTreeMap<String, StorePath> as *mut std::os::raw::c_void;
+        let userdata =
+            &mut outputs as *mut BTreeMap<String, StorePath> as *mut std::os::raw::c_void;
 
         unsafe extern "C" fn callback(
             userdata: *mut std::os::raw::c_void,
@@ -519,8 +523,8 @@ impl Clone for Store {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use ctor::ctor;
+    use std::collections::HashMap;
 
     use super::*;
 
@@ -537,7 +541,8 @@ mod tests {
 
         // Set custom build dir for sandbox
         if cfg!(target_os = "linux") {
-            nix_bindings_util::settings::set("sandbox-build-dir", "/custom-build-dir-for-test").ok();
+            nix_bindings_util::settings::set("sandbox-build-dir", "/custom-build-dir-for-test")
+                .ok();
         }
 
         std::env::set_var("_NIX_TEST_NO_SANDBOX", "1");
@@ -601,7 +606,7 @@ mod tests {
     #[test]
     fn parse_store_path_fail() {
         let mut store = crate::store::Store::open(Some("dummy://"), []).unwrap();
-        let store_path_string = format!("bash-interactive-5.2p26");
+        let store_path_string = "bash-interactive-5.2p26".to_string();
         let r = store.parse_store_path(store_path_string.as_str());
         match r {
             Err(e) => {
@@ -631,6 +636,7 @@ mod tests {
         assert!(weak.inner.upgrade().is_none());
     }
 
+    #[cfg(nix_at_least = "2.31")]
     fn create_temp_store() -> (Store, tempfile::TempDir) {
         let temp_dir = tempfile::tempdir().unwrap();
 
@@ -657,35 +663,34 @@ mod tests {
     }
 
     #[cfg(nix_at_least = "2.31")]
-    fn create_test_derivation_json() -> String {
+    fn create_test_derivation_json() -> serde_json::Value {
         let system = current_system().unwrap_or_else(|_| {
             // Fallback to Rust's platform detection
             format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
         });
-        format!(
-            r#"{{
-                "args": ["-c", "echo $name foo > $out"],
+        serde_json::json!({
+            "args": ["-c", "echo $name foo > $out"],
+            "builder": "/bin/sh",
+            "env": {
                 "builder": "/bin/sh",
-                "env": {{
-                    "builder": "/bin/sh",
-                    "name": "myname",
-                    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
-                    "system": "{}"
-                }},
-                "inputDrvs": {{}},
-                "inputSrcs": [],
                 "name": "myname",
-                "outputs": {{
-                    "out": {{
+                "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+                "system": system
+            },
+            "inputs": {
+                "drvs": {},
+                "srcs": []
+            },
+            "name": "myname",
+            "outputs": {
+                "out": {
                     "hashAlgo": "sha256",
                     "method": "nar"
-                    }}
-                }},
-                "system": "{}",
-                "version": 3
-            }}"#,
-            system, system
-        )
+                }
+            },
+            "system": system,
+            "version": 4
+        })
     }
 
     #[test]
@@ -693,7 +698,7 @@ mod tests {
     fn derivation_from_json() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
-        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
         // If we got here, parsing succeeded
         drop(drv);
         drop(store);
@@ -712,10 +717,33 @@ mod tests {
 
     #[test]
     #[cfg(nix_at_least = "2.31")]
+    fn derivation_to_json_round_trip() {
+        let (mut store, _temp_dir) = create_temp_store();
+        let original_value = create_test_derivation_json();
+
+        // Parse JSON to Derivation
+        let drv = store
+            .derivation_from_json(&original_value.to_string())
+            .unwrap();
+
+        // Convert back to JSON
+        let round_trip_json = drv.to_json_string().unwrap();
+        let round_trip_value: serde_json::Value = serde_json::from_str(&round_trip_json).unwrap();
+
+        // Verify the round-trip JSON matches the original
+        assert_eq!(
+            original_value, round_trip_value,
+            "Round-trip JSON should match original.\nOriginal: {}\nRound-trip: {}",
+            original_value, round_trip_value
+        );
+    }
+
+    #[test]
+    #[cfg(nix_at_least = "2.31")]
     fn add_derivation() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
-        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
         let drv_path = store.add_derivation(&drv).unwrap();
 
         // Verify we got a .drv path
@@ -731,7 +759,7 @@ mod tests {
     fn realise() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
-        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
         let drv_path = store.add_derivation(&drv).unwrap();
 
         // Build the derivation
@@ -748,50 +776,48 @@ mod tests {
     }
 
     #[cfg(nix_at_least = "2.31")]
-    fn create_multi_output_derivation_json() -> String {
-        let system = current_system().unwrap_or_else(|_| {
-            format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
-        });
+    fn create_multi_output_derivation_json() -> serde_json::Value {
+        let system = current_system()
+            .unwrap_or_else(|_| format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS));
 
-        format!(
-            r#"{{
-                "version": 3,
-                "name": "multi-output-test",
-                "system": "{}",
+        serde_json::json!({
+            "version": 4,
+            "name": "multi-output-test",
+            "system": system,
+            "builder": "/bin/sh",
+            "args": ["-c", "echo a > $outa; echo b > $outb; echo c > $outc; echo d > $outd; echo e > $oute; echo f > $outf; echo g > $outg; echo h > $outh; echo i > $outi; echo j > $outj"],
+            "env": {
                 "builder": "/bin/sh",
-                "args": ["-c", "echo a > $outa; echo b > $outb; echo c > $outc; echo d > $outd; echo e > $oute; echo f > $outf; echo g > $outg; echo h > $outh; echo i > $outi; echo j > $outj"],
-                "env": {{
-                    "builder": "/bin/sh",
-                    "name": "multi-output-test",
-                    "system": "{}",
-                    "outf": "/1vkfzqpwk313b51x0xjyh5s7w1lx141mr8da3dr9wqz5aqjyr2fh",
-                    "outd": "/1ypxifgmbzp5sd0pzsp2f19aq68x5215260z3lcrmy5fch567lpm",
-                    "outi": "/1wmasjnqi12j1mkjbxazdd0qd0ky6dh1qry12fk8qyp5kdamhbdx",
-                    "oute": "/1f9r2k1s168js509qlw8a9di1qd14g5lqdj5fcz8z7wbqg11qp1f",
-                    "outh": "/1rkx1hmszslk5nq9g04iyvh1h7bg8p92zw0hi4155hkjm8bpdn95",
-                    "outc": "/1rj4nsf9pjjqq9jsq58a2qkwa7wgvgr09kgmk7mdyli6h1plas4w",
-                    "outb": "/1p7i1dxifh86xq97m5kgb44d7566gj7rfjbw7fk9iij6ca4akx61",
-                    "outg": "/14f8qi0r804vd6a6v40ckylkk1i6yl6fm243qp6asywy0km535lc",
-                    "outj": "/0gkw1366qklqfqb2lw1pikgdqh3cmi3nw6f1z04an44ia863nxaz",
-                    "outa": "/039akv9zfpihrkrv4pl54f3x231x362bll9afblsgfqgvx96h198"
-                }},
-                "inputDrvs": {{}},
-                "inputSrcs": [],
-                "outputs": {{
-                    "outd": {{ "hashAlgo": "sha256", "method": "nar" }},
-                    "outf": {{ "hashAlgo": "sha256", "method": "nar" }},
-                    "outg": {{ "hashAlgo": "sha256", "method": "nar" }},
-                    "outb": {{ "hashAlgo": "sha256", "method": "nar" }},
-                    "outc": {{ "hashAlgo": "sha256", "method": "nar" }},
-                    "outi": {{ "hashAlgo": "sha256", "method": "nar" }},
-                    "outj": {{ "hashAlgo": "sha256", "method": "nar" }},
-                    "outh": {{ "hashAlgo": "sha256", "method": "nar" }},
-                    "outa": {{ "hashAlgo": "sha256", "method": "nar" }},
-                    "oute": {{ "hashAlgo": "sha256", "method": "nar" }}
-                }}
-            }}"#,
-            system, system
-        )
+                "name": "multi-output-test",
+                "system": system,
+                "outf": "/1vkfzqpwk313b51x0xjyh5s7w1lx141mr8da3dr9wqz5aqjyr2fh",
+                "outd": "/1ypxifgmbzp5sd0pzsp2f19aq68x5215260z3lcrmy5fch567lpm",
+                "outi": "/1wmasjnqi12j1mkjbxazdd0qd0ky6dh1qry12fk8qyp5kdamhbdx",
+                "oute": "/1f9r2k1s168js509qlw8a9di1qd14g5lqdj5fcz8z7wbqg11qp1f",
+                "outh": "/1rkx1hmszslk5nq9g04iyvh1h7bg8p92zw0hi4155hkjm8bpdn95",
+                "outc": "/1rj4nsf9pjjqq9jsq58a2qkwa7wgvgr09kgmk7mdyli6h1plas4w",
+                "outb": "/1p7i1dxifh86xq97m5kgb44d7566gj7rfjbw7fk9iij6ca4akx61",
+                "outg": "/14f8qi0r804vd6a6v40ckylkk1i6yl6fm243qp6asywy0km535lc",
+                "outj": "/0gkw1366qklqfqb2lw1pikgdqh3cmi3nw6f1z04an44ia863nxaz",
+                "outa": "/039akv9zfpihrkrv4pl54f3x231x362bll9afblsgfqgvx96h198"
+            },
+            "inputs": {
+                "drvs": {},
+                "srcs": []
+            },
+            "outputs": {
+                "outd": { "hashAlgo": "sha256", "method": "nar" },
+                "outf": { "hashAlgo": "sha256", "method": "nar" },
+                "outg": { "hashAlgo": "sha256", "method": "nar" },
+                "outb": { "hashAlgo": "sha256", "method": "nar" },
+                "outc": { "hashAlgo": "sha256", "method": "nar" },
+                "outi": { "hashAlgo": "sha256", "method": "nar" },
+                "outj": { "hashAlgo": "sha256", "method": "nar" },
+                "outh": { "hashAlgo": "sha256", "method": "nar" },
+                "outa": { "hashAlgo": "sha256", "method": "nar" },
+                "oute": { "hashAlgo": "sha256", "method": "nar" }
+            }
+        })
     }
 
     #[test]
@@ -799,7 +825,7 @@ mod tests {
     fn realise_multi_output_ordering() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_multi_output_derivation_json();
-        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
         let drv_path = store.add_derivation(&drv).unwrap();
 
         // Build the derivation
@@ -807,7 +833,9 @@ mod tests {
 
         // Verify outputs are complete (BTreeMap guarantees ordering)
         let output_names: Vec<&String> = outputs.keys().collect();
-        let expected_order = vec!["outa", "outb", "outc", "outd", "oute", "outf", "outg", "outh", "outi", "outj"];
+        let expected_order = vec![
+            "outa", "outb", "outc", "outd", "oute", "outf", "outg", "outh", "outi", "outj",
+        ];
         assert_eq!(output_names, expected_order);
 
         drop(store);
@@ -821,32 +849,31 @@ mod tests {
 
         // Create a derivation with an invalid system
         let system = "bogus65-bogusos";
-        let drv_json = format!(
-            r#"{{
-                "args": ["-c", "echo $name foo > $out"],
+        let drv_json = serde_json::json!({
+            "args": ["-c", "echo $name foo > $out"],
+            "builder": "/bin/sh",
+            "env": {
                 "builder": "/bin/sh",
-                "env": {{
-                    "builder": "/bin/sh",
-                    "name": "myname",
-                    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
-                    "system": "{}"
-                }},
-                "inputDrvs": {{}},
-                "inputSrcs": [],
                 "name": "myname",
-                "outputs": {{
-                    "out": {{
+                "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+                "system": system
+            },
+            "inputs": {
+                "drvs": {},
+                "srcs": []
+            },
+            "name": "myname",
+            "outputs": {
+                "out": {
                     "hashAlgo": "sha256",
                     "method": "nar"
-                    }}
-                }},
-                "system": "{}",
-                "version": 3
-            }}"#,
-            system, system
-        );
+                }
+            },
+            "system": system,
+            "version": 4
+        });
 
-        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
         let drv_path = store.add_derivation(&drv).unwrap();
 
         // Try to build - should fail
@@ -870,37 +897,35 @@ mod tests {
     fn realise_builder_fails() {
         let (mut store, temp_dir) = create_temp_store();
 
-        let system = current_system().unwrap_or_else(|_| {
-            format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
-        });
+        let system = current_system()
+            .unwrap_or_else(|_| format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS));
 
         // Create a derivation where the builder exits with error
-        let drv_json = format!(
-            r#"{{
-                "args": ["-c", "exit 1"],
+        let drv_json = serde_json::json!({
+            "args": ["-c", "exit 1"],
+            "builder": "/bin/sh",
+            "env": {
                 "builder": "/bin/sh",
-                "env": {{
-                    "builder": "/bin/sh",
-                    "name": "failing",
-                    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
-                    "system": "{}"
-                }},
-                "inputDrvs": {{}},
-                "inputSrcs": [],
                 "name": "failing",
-                "outputs": {{
-                    "out": {{
+                "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+                "system": system
+            },
+            "inputs": {
+                "drvs": {},
+                "srcs": []
+            },
+            "name": "failing",
+            "outputs": {
+                "out": {
                     "hashAlgo": "sha256",
                     "method": "nar"
-                    }}
-                }},
-                "system": "{}",
-                "version": 3
-            }}"#,
-            system, system
-        );
+                }
+            },
+            "system": system,
+            "version": 4
+        });
 
-        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
         let drv_path = store.add_derivation(&drv).unwrap();
 
         // Try to build - should fail
@@ -924,37 +949,35 @@ mod tests {
     fn realise_builder_no_output() {
         let (mut store, temp_dir) = create_temp_store();
 
-        let system = current_system().unwrap_or_else(|_| {
-            format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS)
-        });
+        let system = current_system()
+            .unwrap_or_else(|_| format!("{}-{}", std::env::consts::ARCH, std::env::consts::OS));
 
         // Create a derivation where the builder succeeds but produces no output
-        let drv_json = format!(
-            r#"{{
-                "args": ["-c", "true"],
+        let drv_json = serde_json::json!({
+            "args": ["-c", "true"],
+            "builder": "/bin/sh",
+            "env": {
                 "builder": "/bin/sh",
-                "env": {{
-                    "builder": "/bin/sh",
-                    "name": "no-output",
-                    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
-                    "system": "{}"
-                }},
-                "inputDrvs": {{}},
-                "inputSrcs": [],
                 "name": "no-output",
-                "outputs": {{
-                    "out": {{
+                "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+                "system": system
+            },
+            "inputs": {
+                "drvs": {},
+                "srcs": []
+            },
+            "name": "no-output",
+            "outputs": {
+                "out": {
                     "hashAlgo": "sha256",
                     "method": "nar"
-                    }}
-                }},
-                "system": "{}",
-                "version": 3
-            }}"#,
-            system, system
-        );
+                }
+            },
+            "system": system,
+            "version": 4
+        });
 
-        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
         let drv_path = store.add_derivation(&drv).unwrap();
 
         // Try to build - should fail
@@ -978,7 +1001,7 @@ mod tests {
     fn get_fs_closure_with_outputs() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
-        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
         let drv_path = store.add_derivation(&drv).unwrap();
 
         // Build the derivation to get the output path
@@ -990,11 +1013,17 @@ mod tests {
         let closure = store.get_fs_closure(&drv_path, false, true, false).unwrap();
 
         // The closure should contain at least the derivation and its output
-        assert!(closure.len() >= 2, "Closure should contain at least drv and output");
+        assert!(
+            closure.len() >= 2,
+            "Closure should contain at least drv and output"
+        );
 
         // Verify the output path is in the closure
         let out_in_closure = closure.iter().any(|p| p.name().unwrap() == out_path_name);
-        assert!(out_in_closure, "Output path should be in closure when include_outputs=true");
+        assert!(
+            out_in_closure,
+            "Output path should be in closure when include_outputs=true"
+        );
 
         drop(store);
         drop(temp_dir);
@@ -1005,7 +1034,7 @@ mod tests {
     fn get_fs_closure_without_outputs() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
-        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
         let drv_path = store.add_derivation(&drv).unwrap();
 
         // Build the derivation to get the output path
@@ -1014,11 +1043,16 @@ mod tests {
         let out_path_name = out_path.name().unwrap();
 
         // Get closure with include_outputs=false
-        let closure = store.get_fs_closure(&drv_path, false, false, false).unwrap();
+        let closure = store
+            .get_fs_closure(&drv_path, false, false, false)
+            .unwrap();
 
         // Verify the output path is NOT in the closure
         let out_in_closure = closure.iter().any(|p| p.name().unwrap() == out_path_name);
-        assert!(!out_in_closure, "Output path should not be in closure when include_outputs=false");
+        assert!(
+            !out_in_closure,
+            "Output path should not be in closure when include_outputs=false"
+        );
 
         drop(store);
         drop(temp_dir);
@@ -1029,7 +1063,7 @@ mod tests {
     fn get_fs_closure_flip_direction() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
-        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
         let drv_path = store.add_derivation(&drv).unwrap();
 
         // Build the derivation to get the output path
@@ -1042,7 +1076,10 @@ mod tests {
 
         // Verify the output path is NOT in the closure when direction is flipped
         let out_in_closure = closure.iter().any(|p| p.name().unwrap() == out_path_name);
-        assert!(!out_in_closure, "Output path should not be in closure when flip_direction=true");
+        assert!(
+            !out_in_closure,
+            "Output path should not be in closure when flip_direction=true"
+        );
 
         drop(store);
         drop(temp_dir);
@@ -1053,7 +1090,7 @@ mod tests {
     fn get_fs_closure_include_derivers() {
         let (mut store, temp_dir) = create_temp_store();
         let drv_json = create_test_derivation_json();
-        let drv = store.derivation_from_json(&drv_json).unwrap();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
         let drv_path = store.add_derivation(&drv).unwrap();
         let drv_path_name = drv_path.name().unwrap();
 
@@ -1066,7 +1103,10 @@ mod tests {
 
         // Verify the derivation path is in the closure
         let drv_in_closure = closure.iter().any(|p| p.name().unwrap() == drv_path_name);
-        assert!(drv_in_closure, "Derivation should be in closure when include_derivers=true");
+        assert!(
+            drv_in_closure,
+            "Derivation should be in closure when include_derivers=true"
+        );
 
         drop(store);
         drop(temp_dir);

@@ -1,19 +1,21 @@
 {
   perSystem =
-    {
-      lib,
-      config,
-      pkgs,
-      ...
-    }:
+    { config, ... }:
+    let
+      cfg = config.nix-bindings-rust;
+    in
     {
       # https://flake.parts/options/nix-cargo-integration
       nci.projects.nix-bindings = {
         path = ./.;
+        profiles = {
+          dev.drvConfig.env.RUSTFLAGS = "-D warnings";
+          release.runTests = true;
+        };
         drvConfig = {
           imports = [
             # Downstream projects import this into depsDrvConfig instead
-            config.nix-bindings-rust.nciBuildConfig
+            cfg.nciBuildConfig
           ];
           # Extra settings for running the tests
           mkDerivation = {
@@ -40,12 +42,31 @@
               echo "experimental-features = ca-derivations flakes" > "$NIX_CONF_DIR/nix.conf"
 
               # Init ahead of time, because concurrent initialization is flaky
-              ${config.nix-bindings-rust.nixPackage}/bin/nix-store --init
+              ${cfg.nixPackage}/bin/nix-store --init
 
               echo "Store initialized."
             '';
           };
         };
       };
+      nci.crates.nix-bindings-store =
+        let
+          addHarmoniaProfile = ''
+            cat >> Cargo.toml <<'EOF'
+
+            [profile.harmonia]
+            inherits = "release"
+            EOF
+          '';
+        in
+        {
+          profiles.harmonia = {
+            features = [ "harmonia" ];
+            runTests = true;
+            # Add harmonia profile to Cargo.toml for both deps and main builds
+            depsDrvConfig.mkDerivation.postPatch = addHarmoniaProfile;
+            drvConfig.mkDerivation.postPatch = addHarmoniaProfile;
+          };
+        };
     };
 }

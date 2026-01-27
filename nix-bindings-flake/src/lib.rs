@@ -1,9 +1,9 @@
 use std::{ffi::CString, os::raw::c_char, ptr::NonNull};
 
 use anyhow::{Context as _, Result};
-use nix_bindings_bindgen_raw as raw;
 use nix_bindings_expr::eval_state::EvalState;
 use nix_bindings_fetchers::FetchersSettings;
+use nix_bindings_flake_sys as raw;
 use nix_bindings_util::{
     context::{self, Context},
     result_string_init,
@@ -45,7 +45,10 @@ impl FlakeSettings {
 
 pub trait EvalStateBuilderExt {
     /// Configures the eval state to provide flakes features such as `builtins.getFlake`.
-    fn flakes(self, settings: &FlakeSettings) -> Result<nix_bindings_expr::eval_state::EvalStateBuilder>;
+    fn flakes(
+        self,
+        settings: &FlakeSettings,
+    ) -> Result<nix_bindings_expr::eval_state::EvalStateBuilder>;
 }
 impl EvalStateBuilderExt for nix_bindings_expr::eval_state::EvalStateBuilder {
     /// Configures the eval state to provide flakes features such as `builtins.getFlake`.
@@ -135,7 +138,7 @@ impl FlakeReference {
         }?;
         let ptr = NonNull::new(ptr)
             .context("flake_reference_and_fragment_from_string unexpectedly returned null")?;
-        Ok((FlakeReference { ptr: ptr }, r?))
+        Ok((FlakeReference { ptr }, r?))
     }
 }
 
@@ -308,7 +311,7 @@ mod tests {
 
         let b = eval_state.require_bool(&v).unwrap();
 
-        assert_eq!(b, true);
+        assert!(b);
 
         drop(gc_registration);
     }
@@ -368,7 +371,7 @@ mod tests {
             .outputs(&flake_settings, &mut eval_state)
             .unwrap();
 
-        let hello = eval_state.require_attrs_select(&outputs, &"hello").unwrap();
+        let hello = eval_state.require_attrs_select(&outputs, "hello").unwrap();
         let hello = eval_state.require_string(&hello).unwrap();
 
         assert_eq!(hello, "potato");
@@ -409,7 +412,7 @@ mod tests {
 
         // a
         std::fs::write(
-            &tmp_dir.path().join("a/flake.nix"),
+            tmp_dir.path().join("a/flake.nix"),
             r#"
             {
                 inputs.b.url = "@flake_dir_b@";
@@ -424,7 +427,7 @@ mod tests {
 
         // b
         std::fs::write(
-            &tmp_dir.path().join("b/flake.nix"),
+            tmp_dir.path().join("b/flake.nix"),
             r#"
             {
                 outputs = { ... }: {
@@ -437,7 +440,7 @@ mod tests {
 
         // c
         std::fs::write(
-            &tmp_dir.path().join("c/flake.nix"),
+            tmp_dir.path().join("c/flake.nix"),
             r#"
             {
                 outputs = { ... }: {
@@ -501,7 +504,7 @@ mod tests {
             .outputs(&flake_settings, &mut eval_state)
             .unwrap();
 
-        let hello = eval_state.require_attrs_select(&outputs, &"hello").unwrap();
+        let hello = eval_state.require_attrs_select(&outputs, "hello").unwrap();
         let hello = eval_state.require_string(&hello).unwrap();
 
         assert_eq!(hello, "BOB");
@@ -542,7 +545,7 @@ mod tests {
         let outputs = locked_flake
             .outputs(&flake_settings, &mut eval_state)
             .unwrap();
-        let hello = eval_state.require_attrs_select(&outputs, &"hello").unwrap();
+        let hello = eval_state.require_attrs_select(&outputs, "hello").unwrap();
         let hello = eval_state.require_string(&hello).unwrap();
         assert_eq!(hello, "BOB");
 
@@ -562,7 +565,7 @@ mod tests {
         let outputs = locked_flake
             .outputs(&flake_settings, &mut eval_state)
             .unwrap();
-        let hello = eval_state.require_attrs_select(&outputs, &"hello").unwrap();
+        let hello = eval_state.require_attrs_select(&outputs, "hello").unwrap();
         let hello = eval_state.require_string(&hello).unwrap();
         assert_eq!(hello, "BOB");
 
@@ -596,7 +599,7 @@ mod tests {
         let outputs = locked_flake
             .outputs(&flake_settings, &mut eval_state)
             .unwrap();
-        let hello = eval_state.require_attrs_select(&outputs, &"hello").unwrap();
+        let hello = eval_state.require_attrs_select(&outputs, "hello").unwrap();
         let hello = eval_state.require_string(&hello).unwrap();
         assert_eq!(hello, "Claire");
 
@@ -619,7 +622,7 @@ mod tests {
         let outputs = locked_flake
             .outputs(&flake_settings, &mut eval_state)
             .unwrap();
-        let hello = eval_state.require_attrs_select(&outputs, &"hello").unwrap();
+        let hello = eval_state.require_attrs_select(&outputs, "hello").unwrap();
         let hello = eval_state.require_string(&hello).unwrap();
         assert_eq!(hello, "BOB");
 

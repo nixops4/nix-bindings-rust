@@ -134,11 +134,15 @@ use anyhow::Context as _;
 use anyhow::{bail, Result};
 use cstr::cstr;
 use lazy_static::lazy_static;
-use nix_bindings_bindgen_raw as raw;
+use nix_bindings_bdwgc_sys as gc;
+use nix_bindings_expr_sys as raw;
 use nix_bindings_store::path::StorePath;
 use nix_bindings_store::store::{Store, StoreWeak};
+use nix_bindings_store_sys as raw_store;
 use nix_bindings_util::context::Context;
-use nix_bindings_util::string_return::{callback_get_result_string, callback_get_result_string_data};
+use nix_bindings_util::string_return::{
+    callback_get_result_string, callback_get_result_string_data,
+};
 use nix_bindings_util::{check_call, check_call_opt_key, result_string_init};
 use std::ffi::{c_char, CString};
 use std::iter::FromIterator;
@@ -149,7 +153,7 @@ use std::sync::{Arc, Weak};
 lazy_static! {
     static ref INIT: Result<()> = {
         unsafe {
-            raw::GC_allow_register_threads();
+            gc::GC_allow_register_threads();
             check_call!(raw::libexpr_init(&mut Context::new()))?;
             Ok(())
         }
@@ -222,6 +226,8 @@ impl Drop for EvalStateRef {
 /// Provides advanced configuration options for evaluation context setup.
 /// Use [`EvalState::new`] for simple cases or this builder for custom configuration.
 ///
+/// Requires Nix 2.26.0 or later.
+///
 /// # Examples
 ///
 /// ```rust
@@ -242,11 +248,14 @@ impl Drop for EvalStateRef {
 /// # Ok(())
 /// # }
 /// ```
+#[cfg(nix_at_least = "2.26")]
 pub struct EvalStateBuilder {
     eval_state_builder: *mut raw::eval_state_builder,
     lookup_path: Vec<CString>,
+    load_ambient_settings: bool,
     store: Store,
 }
+#[cfg(nix_at_least = "2.26")]
 impl Drop for EvalStateBuilder {
     fn drop(&mut self) {
         unsafe {
@@ -254,6 +263,7 @@ impl Drop for EvalStateBuilder {
         }
     }
 }
+#[cfg(nix_at_least = "2.26")]
 impl EvalStateBuilder {
     /// Creates a new [`EvalStateBuilder`].
     pub fn new(store: Store) -> Result<EvalStateBuilder> {
@@ -264,6 +274,7 @@ impl EvalStateBuilder {
             store,
             eval_state_builder,
             lookup_path: Vec::new(),
+            load_ambient_settings: true,
         })
     }
     /// Sets the [lookup path](https://nix.dev/manual/nix/latest/language/constructs/lookup-path.html) for Nix expression evaluation.
@@ -279,12 +290,32 @@ impl EvalStateBuilder {
         self.lookup_path = lookup_path;
         Ok(self)
     }
+    /// Sets whether to load settings from the ambient environment.
+    ///
+    /// When enabled (default), calls `nix_eval_state_builder_load` to load settings
+    /// from NIX_CONFIG and other environment variables. When disabled, only the
+    /// explicitly configured settings are used.
+    pub fn load_ambient_settings(mut self, load: bool) -> Self {
+        self.load_ambient_settings = load;
+        self
+    }
     /// Builds the configured [`EvalState`].
     pub fn build(&self) -> Result<EvalState> {
         // Make sure the library is initialized
         init()?;
 
         let mut context = Context::new();
+
+        // Load settings from global configuration (including readOnlyMode = false).
+        // This is necessary for path coercion to work (adding files to the store).
+        if self.load_ambient_settings {
+            unsafe {
+                check_call!(raw::eval_state_builder_load(
+                    &mut context,
+                    self.eval_state_builder
+                ))?;
+            }
+        }
 
         // Note: these raw C string pointers borrow from self.lookup_path
         let mut lookup_path: Vec<*const c_char> = self
@@ -411,6 +442,8 @@ impl EvalState {
     /// Converts [thunks](https://nix.dev/manual/nix/latest/language/evaluation.html#laziness) to their evaluated form. Does not modify already-evaluated values.
     ///
     /// Does not perform deep evaluation of nested structures.
+    ///
+    /// See also: [Shared Evaluation State](Value#shared-evaluation-state)
     #[doc(alias = "evaluate")]
     #[doc(alias = "strict")]
     pub fn force(&mut self, v: &Value) -> Result<()> {
@@ -429,6 +462,8 @@ impl EvalState {
     /// Returns [`None`] if the value is an unevaluated [thunk](https://nix.dev/manual/nix/latest/language/evaluation.html#laziness).
     ///
     /// Returns [`Some`] if the value is already evaluated.
+    ///
+    /// See also: [Shared Evaluation State](Value#shared-evaluation-state)
     #[doc(alias = "type_of")]
     #[doc(alias = "value_type_lazy")]
     #[doc(alias = "nix_get_type")]
@@ -658,9 +693,9 @@ impl EvalState {
     ///
     /// Returns [`Err`] if evaluation failed or the value is not an attribute set.
     ///
-    /// Returns [`Ok(None)`] if the attribute is not present.
+    /// Returns `Ok(None)` if the attribute is not present.
     ///
-    /// Returns [`Ok(Some(value))`] if the attribute is present.
+    /// Returns `Ok(Some(value))` if the attribute is present.
     #[doc(alias = "nix_get_attr_byname")]
     #[doc(alias = "get_attr_byname")]
     #[doc(alias = "get_attr_opt")]
@@ -710,11 +745,11 @@ impl EvalState {
     /// Extracts an element from a [list][`ValueType::List`] Nix value by index.
     ///
     /// Forces [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) and verifies the value is a list.
-    /// Forces evaluation of the selected element, similar to [`require_attrs_select`].
+    /// Forces evaluation of the selected element, similar to [`Self::require_attrs_select`].
     ///
-    /// Returns [`Ok(Some(value))`] if the element is found.
+    /// Returns `Ok(Some(value))` if the element is found.
     ///
-    /// Returns [`Ok(None)`] if the index is out of bounds.
+    /// Returns `Ok(None)` if the index is out of bounds.
     ///
     /// Returns [`Err`] if evaluation failed, the element contains an error (e.g., `throw`), or the value is not a list.
     #[doc(alias = "get")]
@@ -873,7 +908,7 @@ impl EvalState {
         }?;
 
         let s = unsafe {
-            let start = raw::realised_string_get_buffer_start(rs) as *const u8;
+            let start = raw::realised_string_get_buffer_start(rs);
             let size = raw::realised_string_get_buffer_size(rs);
             let slice = std::slice::from_raw_parts(start, size);
             String::from_utf8(slice.to_vec())
@@ -885,7 +920,7 @@ impl EvalState {
             let mut paths = Vec::with_capacity(n as usize);
             for i in 0..n {
                 let path = raw::realised_string_get_store_path(rs, i);
-                let path = NonNull::new(path as *mut raw::StorePath).ok_or_else(|| {
+                let path = NonNull::new(path as *mut raw_store::StorePath).ok_or_else(|| {
                     anyhow::format_err!(
                         "nix_realised_string_get_store_path returned a null pointer"
                     )
@@ -906,7 +941,7 @@ impl EvalState {
     /// Applies a function to an argument and returns the result.
     ///
     /// Forces [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) of the function application.
-    /// For a lazy version, see [`new_value_apply`].
+    /// For a lazy version, see [`Self::new_value_apply`].
     #[doc(alias = "nix_value_call")]
     #[doc(alias = "value_call")]
     #[doc(alias = "apply")]
@@ -988,7 +1023,7 @@ impl EvalState {
     /// Applies a function to an argument lazily, creating a [thunk](https://nix.dev/manual/nix/latest/language/evaluation.html#laziness).
     ///
     /// Does not force [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) of the function application.
-    /// For an eager version, see [`call`].
+    /// For an eager version, see [`Self::call`].
     #[doc(alias = "lazy_apply")]
     #[doc(alias = "thunk_apply")]
     #[doc(alias = "defer_call")]
@@ -1035,10 +1070,10 @@ impl EvalState {
         Ok(value)
     }
 
-    /// Creates a new [attribute set][`ValueType::Attrs`] Nix value from an iterator of name-value pairs.
+    /// Creates a new [attribute set][`ValueType::AttrSet`] Nix value from an iterator of name-value pairs.
     ///
     /// Accepts any iterator that yields `(String, Value)` pairs and has an exact size.
-    /// Common usage includes [`Vec`], [`HashMap`], and array literals.
+    /// Common usage includes [`Vec`], [`std::collections::HashMap`], and array literals.
     ///
     /// # Examples
     ///
@@ -1151,7 +1186,7 @@ impl Drop for ThreadRegistrationGuard {
     fn drop(&mut self) {
         if self.must_unregister {
             unsafe {
-                raw::GC_unregister_my_thread();
+                gc::GC_unregister_my_thread();
             }
         }
     }
@@ -1159,14 +1194,14 @@ impl Drop for ThreadRegistrationGuard {
 
 fn gc_register_my_thread_do_it() -> Result<()> {
     unsafe {
-        let mut sb: raw::GC_stack_base = raw::GC_stack_base {
+        let mut sb: gc::GC_stack_base = gc::GC_stack_base {
             mem_base: null_mut(),
         };
-        let r = raw::GC_get_stack_base(&mut sb);
-        if r as u32 != raw::GC_SUCCESS {
+        let r = gc::GC_get_stack_base(&mut sb);
+        if r as u32 != gc::GC_SUCCESS {
             Err(anyhow::format_err!("GC_get_stack_base failed: {}", r))?;
         }
-        raw::GC_register_my_thread(&sb);
+        gc::GC_register_my_thread(&sb);
         Ok(())
     }
 }
@@ -1177,7 +1212,7 @@ fn gc_register_my_thread_do_it() -> Result<()> {
 pub fn gc_register_my_thread() -> Result<ThreadRegistrationGuard> {
     init()?;
     unsafe {
-        let already_done = raw::GC_thread_is_registered();
+        let already_done = gc::GC_thread_is_registered();
         if already_done != 0 {
             return Ok(ThreadRegistrationGuard {
                 must_unregister: false,
@@ -1217,7 +1252,8 @@ pub fn test_init() {
     // which causes an error. So we set a custom build dir here.
     // Only available on linux
     if cfg!(target_os = "linux") {
-        nix_bindings_util::settings::set("sandbox-build-dir", "/custom-build-dir-for-test").unwrap();
+        nix_bindings_util::settings::set("sandbox-build-dir", "/custom-build-dir-for-test")
+            .unwrap();
     }
     std::env::set_var("_NIX_TEST_NO_SANDBOX", "1");
 
@@ -1238,6 +1274,12 @@ mod tests {
     #[ctor]
     fn setup() {
         test_init();
+
+        // Configure Nix settings for the test suite
+        // Set max-call-depth to 1000 (lower than default 10000) for the
+        // eval_state_builder_loads_max_call_depth test case, while
+        // giving other tests sufficient room for normal evaluation.
+        std::env::set_var("NIX_CONFIG", "max-call-depth = 1000");
     }
 
     /// Run a function while making sure that the current thread is registered with the GC.
@@ -1379,7 +1421,7 @@ mod tests {
             let a = es.eval_from_string("2", "<test>").unwrap();
             let v = es.new_value_apply(&f, &a).unwrap();
             let t = es.value_type_unforced(&v);
-            assert!(t == None);
+            assert!(t.is_none());
             let i = es.require_int(&v).unwrap();
             assert!(i == 3);
         })
@@ -1395,9 +1437,9 @@ mod tests {
             let a = es.eval_from_string("true", "<test>").unwrap();
             let v = es.new_value_apply(&f, &a).unwrap();
             let t = es.value_type_unforced(&v);
-            assert!(t == None);
+            assert!(t.is_none());
             let i = es.require_bool(&v).unwrap();
-            assert!(i == false);
+            assert!(!i);
         })
         .unwrap();
     }
@@ -1420,7 +1462,7 @@ mod tests {
             let mut es = EvalState::new(store, []).unwrap();
             let v = make_thunk(&mut es, "1");
             let t = es.value_type_unforced(&v);
-            assert!(t == None);
+            assert!(t.is_none());
         })
         .unwrap();
     }
@@ -1447,7 +1489,7 @@ mod tests {
             let mut es = EvalState::new(store, []).unwrap();
             let v = make_thunk(&mut es, "{ a = 1; b = 2; }");
             let t = es.value_type_unforced(&v);
-            assert!(t == None);
+            assert!(t.is_none());
             let attrs = es.require_attrs_names_unsorted(&v).unwrap();
             assert_eq!(attrs.len(), 2);
         })
@@ -1504,7 +1546,7 @@ mod tests {
                     let s = format!("{e:#}");
                     if !s.contains("attribute `c` not found") {
                         eprintln!("unexpected error message: {}", s);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -1539,7 +1581,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("oh no the error") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -1591,7 +1633,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("oh no the error") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -1727,7 +1769,7 @@ mod tests {
             let t = es.value_type_unforced(&v);
             assert!(t == Some(ValueType::String));
             let s = es.require_string(&v).unwrap();
-            assert!(s == "");
+            assert!(s.is_empty());
         })
         .unwrap();
     }
@@ -1743,7 +1785,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("contains null byte") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -1784,9 +1826,7 @@ mod tests {
         gc_registering_current_thread(|| {
             let store = Store::open(None, HashMap::new()).unwrap();
             let mut es = EvalState::new(store, []).unwrap();
-            let v = es
-                .eval_from_string("[ ]", "<test>")
-                .unwrap();
+            let v = es.eval_from_string("[ ]", "<test>").unwrap();
             es.force(&v).unwrap();
             let t = es.value_type_unforced(&v);
             assert!(t == Some(ValueType::List));
@@ -1831,7 +1871,7 @@ mod tests {
             let list: Vec<Value> = es.require_list_strict(&v).unwrap();
             assert_eq!(list.len(), 2);
             assert_eq!(es.require_int(&list[0]).unwrap(), 42);
-            assert_eq!(es.require_bool(&list[1]).unwrap(), true);
+            assert!(es.require_bool(&list[1]).unwrap());
         })
         .unwrap();
     }
@@ -1971,7 +2011,7 @@ mod tests {
             let f = es.eval_from_string("x: x + 1", "<test>").unwrap();
             let a = es.eval_from_string("2", "<test>").unwrap();
             let v = es.new_value_apply(&f, &a).unwrap();
-            assert!(es.value_type_unforced(&v) == None);
+            assert!(es.value_type_unforced(&v).is_none());
             es.force(&v).unwrap();
             let t = es.value_type_unforced(&v);
             assert!(t == Some(ValueType::Int));
@@ -1994,7 +2034,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("cannot coerce") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2017,7 +2057,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("expected an integer but found") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2041,7 +2081,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("cannot coerce") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2063,7 +2103,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("called without required argument") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2086,7 +2126,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("called without required argument") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2111,7 +2151,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("called without required argument") {
                         eprintln!("{}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2179,8 +2219,7 @@ mod tests {
             for derivation in derivations {
                 assert!(store_contents
                     .iter()
-                    .find(|f| f.as_encoded_bytes().ends_with(derivation))
-                    .is_some());
+                    .any(|f| f.as_encoded_bytes().ends_with(derivation)));
             }
             assert!(!empty(read_dir(state.path()).unwrap()));
 
@@ -2214,7 +2253,7 @@ mod tests {
                     let a = es.require_int(a)?;
                     let b = es.require_int(b)?;
                     let c = *bias.lock().unwrap();
-                    Ok(es.new_value_int(a + b + c)?)
+                    es.new_value_int(a + b + c)
                 }),
             )
             .unwrap();
@@ -2268,7 +2307,7 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("error with arg [2]") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2284,7 +2323,7 @@ mod tests {
             let v = es
                 .new_value_thunk(
                     "test_thunk",
-                    Box::new(move |es: &mut EvalState| Ok(es.new_value_int(42)?)),
+                    Box::new(move |es: &mut EvalState| es.new_value_int(42)),
                 )
                 .unwrap();
             es.force(&v).unwrap();
@@ -2318,11 +2357,11 @@ mod tests {
                         "error message in test case eval_state_primop_anon_call_no_args_lazy",
                     ) {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                     if !e.to_string().contains("test_thunk") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2345,7 +2384,7 @@ mod tests {
                 Box::new(|es, args| {
                     let a = es.require_int(&args[0])?;
                     let b = es.require_int(&args[1])?;
-                    Ok(es.new_value_int(a + b)?)
+                    es.new_value_int(a + b)
                 }),
             )
             .unwrap();
@@ -2385,11 +2424,11 @@ mod tests {
                 Err(e) => {
                     if !e.to_string().contains("The frob unexpectedly fizzled") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                     if !e.to_string().contains("frobnicate") {
                         eprintln!("unexpected error message: {}", e);
-                        assert!(false);
+                        panic!();
                     }
                 }
             }
@@ -2639,6 +2678,174 @@ mod tests {
                 Err(e) => {
                     let err_msg = e.to_string();
                     assert!(err_msg.contains("expected a list, but got a"));
+                }
+            }
+        })
+        .unwrap();
+    }
+
+    /// Test for path coercion fix (commit 8f6ec2e, <https://github.com/nixops4/nix-bindings-rust/pull/35>).
+    ///
+    /// This test verifies that path coercion works correctly with EvalStateBuilder.
+    /// Path coercion requires readOnlyMode = false, which is loaded from global
+    /// settings by calling eval_state_builder_load().
+    ///
+    /// # Background
+    ///
+    /// Without the eval_state_builder_load() call, settings from global Nix
+    /// configuration are never loaded, leaving readOnlyMode = true (the default).
+    /// This prevents Nix from adding paths to the store during evaluation,
+    /// which could cause errors like: "error: path '/some/local/path' does not exist"
+    ///
+    /// # Test Coverage
+    ///
+    /// This test exercises store file creation:
+    /// 1. builtins.toFile successfully creates files in the store
+    /// 2. Files are actually written to /nix/store
+    /// 3. Content is written correctly
+    ///
+    /// Note: This test may not reliably fail without the fix in all environments.
+    /// Use eval_state_builder_loads_max_call_depth for a deterministic test.
+    #[test]
+    #[cfg(nix_at_least = "2.26" /* real_path, eval_state_builder_load */)]
+    fn eval_state_builder_path_coercion() {
+        gc_registering_current_thread(|| {
+            let mut store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalStateBuilder::new(store.clone())
+                .unwrap()
+                .build()
+                .unwrap();
+
+            // Use builtins.toFile to create a file in the store.
+            // This operation requires readOnlyMode = false to succeed.
+            let expr = r#"builtins.toFile "test-file.txt" "test content""#;
+
+            // Evaluate the expression
+            let value = es.eval_from_string(expr, "<test>").unwrap();
+
+            // Realise the string to get the path and associated store paths
+            let realised = es.realise_string(&value, false).unwrap();
+
+            // Verify we got exactly one store path
+            assert_eq!(
+                realised.paths.len(),
+                1,
+                "Expected 1 store path, got {}",
+                realised.paths.len()
+            );
+
+            // Get the physical filesystem path for the store path
+            // In a relocated store, this differs from realised.s
+            let physical_path = store.real_path(&realised.paths[0]).unwrap();
+
+            // Verify the store path actually exists on disk
+            assert!(
+                std::path::Path::new(&physical_path).exists(),
+                "Store path should exist: {}",
+                physical_path
+            );
+
+            // Verify the content was written correctly
+            let store_content = std::fs::read_to_string(&physical_path).unwrap();
+            assert_eq!(store_content, "test content");
+        })
+        .unwrap();
+    }
+
+    /// Test that eval_state_builder_load() loads settings.
+    ///
+    /// Uses max-call-depth as the test setting. The test suite sets
+    /// max-call-depth = 1000 via NIX_CONFIG in setup() for the purpose of this test case.
+    /// This test creates a recursive function that calls itself 1100 times.
+    ///
+    /// - WITH the fix: Settings are loaded, max-call-depth=1000 is enforced,
+    ///   recursion fails at depth 1000
+    /// - WITHOUT the fix: Settings aren't loaded, default max-call-depth=10000
+    ///   is used, recursion of 1100 succeeds when it should fail
+    ///
+    /// Complementary to eval_state_builder_ignores_ambient_when_disabled which verifies
+    /// that ambient settings are NOT loaded when disabled.
+    #[test]
+    #[cfg(nix_at_least = "2.26")]
+    fn eval_state_builder_loads_max_call_depth() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalStateBuilder::new(store).unwrap().build().unwrap();
+
+            // Create a recursive function that calls itself 1100 times
+            // This should fail because max-call-depth is 1000 (set in setup())
+            let expr = r#"
+                let
+                  recurse = n: if n == 0 then "done" else recurse (n - 1);
+                in
+                  recurse 1100
+            "#;
+
+            let result = es.eval_from_string(expr, "<test>");
+
+            match result {
+                Err(e) => {
+                    let err_str = e.to_string();
+                    assert!(
+                        err_str.contains("max-call-depth"),
+                        "Expected max-call-depth error, got: {}",
+                        err_str
+                    );
+                }
+                Ok(_) => {
+                    panic!(
+                        "Expected recursion to fail with max-call-depth=1000, but it succeeded. \
+                         This indicates eval_state_builder_load() was not called."
+                    );
+                }
+            }
+        })
+        .unwrap();
+    }
+
+    /// Test that load_ambient_settings(false) ignores the ambient environment.
+    ///
+    /// The test suite sets max-call-depth = 1000 via NIX_CONFIG in setup().
+    /// When we disable loading ambient settings, this should be ignored and
+    /// the default max-call-depth = 10000 should be used instead.
+    ///
+    /// Complementary to eval_state_builder_loads_max_call_depth which verifies
+    /// that ambient settings ARE loaded when enabled.
+    #[test]
+    #[cfg(nix_at_least = "2.26")]
+    fn eval_state_builder_ignores_ambient_when_disabled() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalStateBuilder::new(store)
+                .unwrap()
+                .load_ambient_settings(false)
+                .build()
+                .unwrap();
+
+            // Create a recursive function that calls itself 1100 times
+            // With ambient settings disabled, default max-call-depth=10000 is used,
+            // so this should succeed (unlike eval_state_builder_loads_max_call_depth)
+            let expr = r#"
+                let
+                  recurse = n: if n == 0 then "done" else recurse (n - 1);
+                in
+                  recurse 1100
+            "#;
+
+            let result = es.eval_from_string(expr, "<test>");
+
+            match result {
+                Ok(value) => {
+                    // Success expected - ambient NIX_CONFIG was ignored
+                    let result_str = es.require_string(&value).unwrap();
+                    assert_eq!(result_str, "done");
+                }
+                Err(e) => {
+                    panic!(
+                        "Expected recursion to succeed with default max-call-depth=10000, \
+                         but it failed: {}. This indicates ambient settings were not ignored.",
+                        e
+                    );
                 }
             }
         })
