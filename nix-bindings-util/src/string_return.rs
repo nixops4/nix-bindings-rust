@@ -26,7 +26,7 @@ pub unsafe extern "C" fn callback_get_result_string(
         return;
     }
 
-    let slice = std::slice::from_raw_parts(start as *const u8, n as usize);
+    let slice = std::slice::from_raw_parts(start.cast::<u8>(), n as usize);
 
     if (*ret).is_ok() {
         panic!(
