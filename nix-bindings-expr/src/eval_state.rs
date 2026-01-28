@@ -133,7 +133,6 @@ use crate::value::{Int, Value, ValueType};
 use anyhow::Context as _;
 use anyhow::{bail, Result};
 use cstr::cstr;
-use lazy_static::lazy_static;
 use nix_bindings_bdwgc_sys as gc;
 use nix_bindings_expr_sys as raw;
 use nix_bindings_store::path::StorePath;
@@ -148,17 +147,13 @@ use std::ffi::{c_char, CString};
 use std::iter::FromIterator;
 use std::os::raw::c_uint;
 use std::ptr::{null, null_mut, NonNull};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 
-lazy_static! {
-    static ref INIT: Result<()> = {
-        unsafe {
-            gc::GC_allow_register_threads();
-            check_call!(raw::libexpr_init(&mut Context::new()))?;
-            Ok(())
-        }
-    };
-}
+static INIT: LazyLock<Result<()>> = LazyLock::new(|| unsafe {
+    gc::GC_allow_register_threads();
+    check_call!(raw::libexpr_init(&mut Context::new()))?;
+    Ok(())
+});
 
 pub fn init() -> Result<()> {
     let x = INIT.as_ref();

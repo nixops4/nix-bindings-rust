@@ -16,7 +16,6 @@ anyhow = "1.0"
 nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.1" }
 nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.1" }
 nix-bindings-store-sys = { path = "../nix-bindings-store-sys", version = "0.2.1" }
-lazy_static = "1.4"
 zerocopy = "0.8"
 harmonia-store-core = { version = "0.0.0-alpha.0", optional = true }
 serde_json = { version = "1.0", optional = true }
