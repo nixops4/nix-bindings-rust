@@ -1,0 +1,2 @@
+window.ALL_CRATES = ["nix_bindings_bdwgc_sys","nix_bindings_expr","nix_bindings_expr_sys","nix_bindings_fetchers","nix_bindings_fetchers_sys","nix_bindings_flake","nix_bindings_flake_sys","nix_bindings_store","nix_bindings_store_sys","nix_bindings_util","nix_bindings_util_sys"];
+//{"start":21,"fragment_lengths":[24,20,24,24,28,21,25,21,25,20,24]}

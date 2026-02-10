@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["FlakeLockFlags","FlakeReference","FlakeReferenceParseFlags","FlakeSettings","LockedFlake"],"trait":["EvalStateBuilderExt"]};

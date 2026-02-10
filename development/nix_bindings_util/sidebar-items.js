@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"macro":["check_call","check_call_opt_key","result_string_init"],"mod":["context","nix_version","settings","string_return"]};

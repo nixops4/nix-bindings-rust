@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["fetchers_settings_free","fetchers_settings_new"],"struct":["fetchers_settings"]};

@@ -1,0 +1,96 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Nix Expression Evaluation"><title>nix_bindings_expr::eval_state - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="nix_bindings_expr" data-themes="" data-resource-suffix="" data-rustdoc-version="1.93.0 (254b59607 2026-01-19)" data-channel="1.93.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-a3946164.js" data-settings-js="settings-c38705f0.js" ><script src="../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-a410ff4d.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module eval_state</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../nix_bindings_expr/index.html">nix_<wbr>bindings_<wbr>expr</a><span class="version">0.2.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module eval_<wbr>state</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#nix-expression-evaluation" title="Nix Expression Evaluation">Nix Expression Evaluation</a><ul><li><a href="#overview" title="Overview">Overview</a></li><li><a href="#value-extraction" title="Value Extraction">Value Extraction</a></li><li><a href="#laziness-and-strictness" title="Laziness and Strictness">Laziness and Strictness</a></li><li><a href="#error-handling" title="Error Handling">Error Handling</a></li><li><a href="#examples" title="Examples">Examples</a></li></ul></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate nix_<wbr>bindings_<wbr>expr</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">nix_bindings_expr</a></div><h1>Module <span>eval_<wbr>state</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/nix_bindings_expr/eval_state.rs.html#1-2848">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="nix-expression-evaluation"><a class="doc-anchor" href="#nix-expression-evaluation">§</a>Nix Expression Evaluation</h2>
+<p>This module provides the core <a href="struct.EvalState.html" title="struct nix_bindings_expr::eval_state::EvalState"><code>EvalState</code></a> type for evaluating Nix expressions
+and extracting typed values from the results.</p>
+<h3 id="overview"><a class="doc-anchor" href="#overview">§</a>Overview</h3>
+<p>The <a href="struct.EvalState.html" title="struct nix_bindings_expr::eval_state::EvalState"><code>EvalState</code></a> manages the evaluation context for Nix expressions, including:</p>
+<ul>
+<li>Expression parsing and evaluation with <a href="struct.EvalState.html#method.eval_from_string" title="method nix_bindings_expr::eval_state::EvalState::eval_from_string"><code>eval_from_string</code></a></li>
+<li>Type-safe value extraction with <a href="struct.EvalState.html#implementations" title="struct nix_bindings_expr::eval_state::EvalState"><code>require_*</code></a> methods</li>
+<li>Memory management and garbage collection integration</li>
+<li>Store integration for derivations and store paths</li>
+<li>Custom function creation with <a href="struct.EvalState.html#method.new_value_primop" title="method nix_bindings_expr::eval_state::EvalState::new_value_primop"><code>new_value_primop</code></a> and <a href="struct.EvalState.html#method.new_value_thunk" title="method nix_bindings_expr::eval_state::EvalState::new_value_thunk"><code>new_value_thunk</code></a></li>
+</ul>
+<h4 id="construction"><a class="doc-anchor" href="#construction">§</a>Construction</h4>
+<p>Create an <a href="struct.EvalState.html" title="struct nix_bindings_expr::eval_state::EvalState"><code>EvalState</code></a> using <a href="struct.EvalState.html#method.new" title="associated function nix_bindings_expr::eval_state::EvalState::new"><code>EvalState::new</code></a> or <a href="struct.EvalStateBuilder.html" title="struct nix_bindings_expr::eval_state::EvalStateBuilder"><code>EvalStateBuilder</code></a> for advanced configuration:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>store = Store::open(<span class="prelude-val">None</span>, HashMap::new())<span class="question-mark">?</span>;
+
+<span class="comment">// Simple creation
+</span><span class="kw">let </span><span class="kw-2">mut </span>es = EvalState::new(store.clone(), [])<span class="question-mark">?</span>;
+
+<span class="comment">// With custom lookup paths
+</span><span class="kw">let </span><span class="kw-2">mut </span>es = EvalStateBuilder::new(store)<span class="question-mark">?
+    </span>.lookup_path([<span class="string">"nixpkgs=/path/to/nixpkgs"</span>])<span class="question-mark">?
+    </span>.build()<span class="question-mark">?</span>;</code></pre></div><h3 id="value-extraction"><a class="doc-anchor" href="#value-extraction">§</a>Value Extraction</h3>
+<p>All <code>require_*</code> methods perform these steps:</p>
+<ol>
+<li><strong>Evaluation</strong>: Force evaluation of thunks as needed</li>
+<li><strong>Type checking</strong>: Verify the value matches the expected type</li>
+<li><strong>Extraction</strong>: Return the typed Rust value or an error</li>
+</ol>
+<p>Methods with <code>_strict</code> in their name also evaluate their return values before returning them.</p>
+<h4 id="evaluation-strictness"><a class="doc-anchor" href="#evaluation-strictness">§</a>Evaluation Strictness</h4>
+<ul>
+<li><strong>Lazy methods</strong> (e.g., <a href="struct.EvalState.html#method.require_list_size" title="method nix_bindings_expr::eval_state::EvalState::require_list_size"><code>require_list_size</code></a>):
+Evaluate only the structure needed</li>
+<li><strong>Strict methods</strong> (e.g., <a href="struct.EvalState.html#method.require_list_strict" title="method nix_bindings_expr::eval_state::EvalState::require_list_strict"><code>require_list_strict</code></a>):
+Force full evaluation of all contained values</li>
+<li><strong>Selective methods</strong> (e.g., <a href="struct.EvalState.html#method.require_list_select_idx_strict" title="method nix_bindings_expr::eval_state::EvalState::require_list_select_idx_strict"><code>require_list_select_idx_strict</code></a>):
+Evaluate only the accessed elements</li>
+</ul>
+<h3 id="laziness-and-strictness"><a class="doc-anchor" href="#laziness-and-strictness">§</a>Laziness and Strictness</h3>
+<p>The terms “lazy” and “strict” in this API refer to Nix’s <a href="https://nix.dev/manual/nix/latest/language/evaluation.html#values">Weak Head Normal Form (WHNF)</a>
+evaluation model, not the kind of deep strictness that is exercised by functions such as <code>builtins.toJSON</code> or <code>builtins.deepSeq</code>.</p>
+<ul>
+<li><strong>WHNF evaluation</strong>: Values are evaluated just enough to determine their type and basic structure</li>
+<li><strong>Deep evaluation</strong>: All nested values are recursively forced (like <code>builtins.deepSeq</code>)</li>
+</ul>
+<p>For example, a list in WHNF has its length determined but individual elements may remain unevaluated thunks.
+Methods marked as “strict” in this API force WHNF evaluation of their results, but do not perform deep evaluation
+of arbitrarily nested structures unless explicitly documented otherwise.</p>
+<h4 id="thread-safety-and-memory-management"><a class="doc-anchor" href="#thread-safety-and-memory-management">§</a>Thread Safety and Memory Management</h4>
+<p>Before using <a href="struct.EvalState.html" title="struct nix_bindings_expr::eval_state::EvalState"><code>EvalState</code></a> in a thread, register it with the (process memory) garbage collector:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>init()<span class="question-mark">?</span>; <span class="comment">// Initialize Nix library
+</span><span class="kw">let </span>guard = gc_register_my_thread()<span class="question-mark">?</span>; <span class="comment">// Register thread with GC
+// Now safe to use EvalState in this thread
+</span>drop(guard);</code></pre></div><h3 id="error-handling"><a class="doc-anchor" href="#error-handling">§</a>Error Handling</h3>
+<p>Evaluation methods return <a href="https://docs.rs/anyhow/1.0.100/anyhow/type.Result.html" title="type anyhow::Result"><code>Result</code></a> types. Common error scenarios include:</p>
+<ul>
+<li><strong>Type mismatches</strong>: Expected type doesn’t match actual value type</li>
+<li><strong>Evaluation errors</strong>: Nix expressions that throw or have undefined behavior</li>
+<li><strong>Bounds errors</strong>: Out-of-range access for indexed operations</li>
+</ul>
+<h3 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>nix_bindings_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
+<span class="kw">use </span>nix_bindings_store::store::Store;
+<span class="kw">use </span>std::collections::HashMap;
+
+test_init(); <span class="comment">// init() in non-test code
+</span><span class="kw">let </span>guard = gc_register_my_thread()<span class="question-mark">?</span>;
+
+<span class="kw">let </span>store = Store::open(<span class="prelude-val">None</span>, HashMap::new())<span class="question-mark">?</span>;
+<span class="kw">let </span><span class="kw-2">mut </span>es = EvalState::new(store, [])<span class="question-mark">?</span>;
+
+<span class="comment">// Evaluate a list expression
+</span><span class="kw">let </span>list_value = es.eval_from_string(<span class="string">"[1 2 3]"</span>, <span class="string">"&lt;example&gt;"</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// Check the size (lazy - doesn't evaluate elements)
+</span><span class="kw">let </span>size = es.require_list_size(<span class="kw-2">&amp;</span>list_value)<span class="question-mark">?</span>;
+<span class="macro">println!</span>(<span class="string">"List has {} elements"</span>, size);
+
+<span class="comment">// Access specific elements (evaluates only accessed elements)
+</span><span class="kw">if let </span><span class="prelude-val">Some</span>(first) = es.require_list_select_idx_strict(<span class="kw-2">&amp;</span>list_value, <span class="number">0</span>)<span class="question-mark">? </span>{
+    <span class="kw">let </span>value = es.require_int(<span class="kw-2">&amp;</span>first)<span class="question-mark">?</span>;
+    <span class="macro">println!</span>(<span class="string">"First element: {}"</span>, value);
+}
+
+<span class="comment">// Process all elements (evaluates all elements)
+</span><span class="kw">let </span>all_elements: Vec&lt;<span class="kw">_</span>&gt; = es.require_list_strict(<span class="kw-2">&amp;</span>list_value)<span class="question-mark">?</span>;
+<span class="kw">for </span>element <span class="kw">in </span>all_elements {
+    <span class="kw">let </span>value = es.require_int(<span class="kw-2">&amp;</span>element)<span class="question-mark">?</span>;
+    <span class="macro">println!</span>(<span class="string">"Element: {}"</span>, value);
+}
+
+drop(guard);</code></pre></div></div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.EvalState.html" title="struct nix_bindings_expr::eval_state::EvalState">Eval<wbr>State</a></dt><dt><a class="struct" href="struct.EvalStateBuilder.html" title="struct nix_bindings_expr::eval_state::EvalStateBuilder">Eval<wbr>State<wbr>Builder</a></dt><dd>Builder for configuring and creating an <a href="struct.EvalState.html" title="struct nix_bindings_expr::eval_state::EvalState"><code>EvalState</code></a>.</dd><dt><a class="struct" href="struct.EvalStateWeak.html" title="struct nix_bindings_expr::eval_state::EvalStateWeak">Eval<wbr>State<wbr>Weak</a></dt><dd>A <a href="https://doc.rust-lang.org/1.93.0/alloc/sync/struct.Weak.html" title="struct alloc::sync::Weak">Weak</a> reference to an <a href="struct.EvalState.html" title="struct nix_bindings_expr::eval_state::EvalState">EvalState</a>.</dd><dt><a class="struct" href="struct.RealisedString.html" title="struct nix_bindings_expr::eval_state::RealisedString">Realised<wbr>String</a></dt><dd>A string value with its associated <a href="https://nix.dev/manual/nix/stable/store/store-path.html">store paths</a>.</dd><dt><a class="struct" href="struct.ThreadRegistrationGuard.html" title="struct nix_bindings_expr::eval_state::ThreadRegistrationGuard">Thread<wbr>Registration<wbr>Guard</a></dt><dd>RAII guard for thread registration with the garbage collector.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.gc_now.html" title="fn nix_bindings_expr::eval_state::gc_now">gc_now</a></dt><dd>Triggers garbage collection immediately.</dd><dt><a class="fn" href="fn.gc_register_my_thread.html" title="fn nix_bindings_expr::eval_state::gc_register_my_thread">gc_<wbr>register_<wbr>my_<wbr>thread</a></dt><dt><a class="fn" href="fn.init.html" title="fn nix_bindings_expr::eval_state::init">init</a></dt><dt><a class="fn" href="fn.test_init.html" title="fn nix_bindings_expr::eval_state::test_init">test_<wbr>init</a></dt><dd>Initialize the Nix library for testing. This includes some modifications to the Nix settings, that must not be used in production.
+Use at your own peril, in rust test suites.</dd></dl></section></div></main></body></html>
