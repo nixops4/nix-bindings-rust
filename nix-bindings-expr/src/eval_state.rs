@@ -1230,6 +1230,8 @@ impl Clone for EvalState {
     }
 }
 
+unsafe impl Send for EvalState { }
+
 /// Initialize the Nix library for testing. This includes some modifications to the Nix settings, that must not be used in production.
 /// Use at your own peril, in rust test suites.
 #[doc(alias = "test_initialize")]
