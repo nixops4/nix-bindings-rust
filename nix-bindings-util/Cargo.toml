@@ -5,6 +5,7 @@ edition = "2021"
 license = "LGPL-2.1"
 description = "Rust bindings to Nix utility library"
 repository = "https://github.com/nixops4/nix-bindings-rust"
+documentation = "https://nixops4.github.io/nix-bindings-rust/development/nix_bindings_util/"
 readme = "README.md"
 
 [lib]

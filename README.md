@@ -211,6 +211,7 @@ For VSCode, load the dev shell via Nix Env Selector extension or direnv.
 
 ## Documentation
 
+- [API Reference](https://nixops4.github.io/nix-bindings-rust/development/)
 - [Changelog](CHANGELOG.md)
 - [Nix C API Reference][C API]
 - [nix-cargo-integration][nix-cargo-integration]

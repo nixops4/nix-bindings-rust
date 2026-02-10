@@ -6,6 +6,7 @@ build = "build.rs"
 license = "LGPL-2.1"
 description = "Low-level FFI bindings to the Boehm-Demers-Weiser garbage collector"
 repository = "https://github.com/nixops4/nix-bindings-rust"
+documentation = "https://nixops4.github.io/nix-bindings-rust/development/nix_bindings_bdwgc_sys/"
 readme = "README.md"
 
 [lib]
