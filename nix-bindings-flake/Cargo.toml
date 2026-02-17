@@ -5,6 +5,7 @@ edition = "2021"
 license = "LGPL-2.1"
 description = "Rust bindings to Nix flakes"
 repository = "https://github.com/nixops4/nix-bindings-rust"
+documentation = "https://nixops4.github.io/nix-bindings-rust/development/nix_bindings_flake/"
 readme = "README.md"
 
 [lib]
@@ -17,7 +18,6 @@ nix-bindings-fetchers = { path = "../nix-bindings-fetchers", version = "0.2.1" }
 nix-bindings-store = { path = "../nix-bindings-store", version = "0.2.1" }
 nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.1" }
 nix-bindings-flake-sys = { path = "../nix-bindings-flake-sys", version = "0.2.1" }
-lazy_static = "1.4"
 ctor = "0.2"
 tempfile = "3.10"
 cstr = "0.2"

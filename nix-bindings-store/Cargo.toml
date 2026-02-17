@@ -6,6 +6,7 @@ build = "build.rs"
 license = "LGPL-2.1"
 description = "Rust bindings to Nix store library"
 repository = "https://github.com/nixops4/nix-bindings-rust"
+documentation = "https://nixops4.github.io/nix-bindings-rust/development/nix_bindings_store/"
 readme = "README.md"
 
 [lib]
@@ -16,7 +17,6 @@ anyhow = "1.0"
 nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.1" }
 nix-bindings-util-sys = { path = "../nix-bindings-util-sys", version = "0.2.1" }
 nix-bindings-store-sys = { path = "../nix-bindings-store-sys", version = "0.2.1" }
-lazy_static = "1.4"
 zerocopy = "0.8"
 harmonia-store-core = { version = "0.0.0-alpha.0", optional = true }
 serde_json = { version = "1.0", optional = true }
