@@ -227,6 +227,20 @@ impl Store {
         r
     }
 
+    #[doc(alias = "nix_store_get_version")]
+    pub fn get_version(&mut self) -> Result<String> {
+        let mut r = result_string_init!();
+        unsafe {
+            check_call!(raw::store_get_version(
+                &mut self.context,
+                self.inner.ptr(),
+                Some(callback_get_result_string),
+                callback_get_result_string_data(&mut r)
+            ))
+        }?;
+        r
+    }
+
     #[doc(alias = "nix_store_parse_path")]
     pub fn parse_store_path(&mut self, path: &str) -> Result<StorePath> {
         let path = CString::new(path)?;
@@ -519,6 +533,15 @@ mod tests {
             }
             _ => panic!("Expected error"),
         }
+    }
+
+    #[test]
+    fn version() {
+        let mut store = crate::store::Store::open(Some("dummy://"), []).unwrap();
+        assert_eq!(store.get_version().unwrap(), String::new());
+
+        let mut store = crate::store::Store::open(None, []).unwrap();
+        assert_ne!(store.get_version().unwrap(), String::new());
     }
 
     #[test]
