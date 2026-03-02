@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `primop::RecoverableError` for primop errors that should not be memoized in the thunk, allowing retry on next force. Required by Nix >= 2.34 ([release note](https://nix.dev/manual/nix/2.34/release-notes/rl-2.34.html#c-api-changes)) for recoverable errors to remain recoverable, as Nix 2.34 memoizes errors by default.
+
 ## [0.2.0] - 2026-01-13
 
 ### Added
