@@ -2845,4 +2845,81 @@ mod tests {
         })
         .unwrap();
     }
+
+    #[test]
+    #[cfg(nix_at_least = "2.34.0pre")]
+    fn eval_state_primop_recoverable_error() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+
+            let call_count = std::cell::Cell::new(0u32);
+            let v = es
+                .new_value_thunk(
+                    "recoverable_test",
+                    Box::new(move |es: &mut EvalState| {
+                        let count = call_count.get();
+                        call_count.set(count + 1);
+                        if count == 0 {
+                            Err(primop::RecoverableError::new("transient failure").into())
+                        } else {
+                            es.new_value_int(42)
+                        }
+                    }),
+                )
+                .unwrap();
+
+            // First force should fail with the recoverable error
+            let r = es.force(&v);
+            assert!(r.is_err());
+            assert!(
+                r.unwrap_err().to_string().contains("transient failure"),
+                "Error message should contain 'transient failure'"
+            );
+
+            // Second force should succeed because the error was recoverable
+            es.force(&v).unwrap();
+            let i = es.require_int(&v).unwrap();
+            assert_eq!(i, 42);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    #[cfg(nix_at_least = "2.34.0pre")]
+    fn eval_state_primop_recoverable_error_in_chain() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+
+            let call_count = std::cell::Cell::new(0u32);
+            let v = es
+                .new_value_thunk(
+                    "recoverable_chain_test",
+                    Box::new(move |es: &mut EvalState| {
+                        let count = call_count.get();
+                        call_count.set(count + 1);
+                        if count == 0 {
+                            // Wrap RecoverableError in .context(), pushing it down the chain
+                            use anyhow::Context;
+                            Err(primop::RecoverableError::new("transient failure"))
+                                .context("wrapper context")?
+                        } else {
+                            es.new_value_int(42)
+                        }
+                    }),
+                )
+                .unwrap();
+
+            // First force should fail
+            let r = es.force(&v);
+            assert!(r.is_err());
+
+            // Second force should succeed if RecoverableError is found in the chain
+            es.force(&v).unwrap();
+            let i = es.require_int(&v).unwrap();
+            assert_eq!(i, 42);
+        })
+        .unwrap();
+    }
 }
