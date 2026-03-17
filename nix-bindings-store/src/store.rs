@@ -439,6 +439,69 @@ impl Store {
         Ok(())
     }
 
+    /// Copy a store path and its entire closure from one store to another.
+    #[doc(alias = "nix_store_copy_closure")]
+    pub fn copy_closure(&mut self, dst_store: &mut Store, path: &StorePath) -> Result<()> {
+        unsafe {
+            check_call!(raw::store_copy_closure(
+                &mut self.context,
+                self.inner.ptr(),
+                dst_store.inner.ptr(),
+                path.as_ptr() as *mut raw::StorePath // C API takes non-const StorePath*
+            ))?;
+        }
+        Ok(())
+    }
+
+    /// Query a store path by its hash part.
+    ///
+    /// Returns `None` if no path with that hash exists.
+    #[doc(alias = "nix_store_query_path_from_hash_part")]
+    pub fn query_path_from_hash_part(&mut self, hash: &str) -> Result<Option<StorePath>> {
+        let hash = std::ffi::CString::new(hash)?;
+        let ptr = unsafe {
+            raw::store_query_path_from_hash_part(
+                self.context.ptr(),
+                self.inner.ptr(),
+                hash.as_ptr(),
+            )
+        };
+        Ok(NonNull::new(ptr).map(|p| unsafe { StorePath::new_raw(p) }))
+    }
+
+    /// Read a derivation from the store by its store path.
+    ///
+    /// **Requires Nix 2.33 or later.**
+    #[cfg(nix_at_least = "2.33.0pre")]
+    #[doc(alias = "nix_store_drv_from_store_path")]
+    pub fn derivation_from_path(&mut self, path: &StorePath) -> Result<Derivation> {
+        unsafe {
+            let drv = check_call!(raw::store_drv_from_store_path(
+                &mut self.context,
+                self.inner.ptr(),
+                path.as_ptr()
+            ))?;
+            let inner =
+                NonNull::new(drv).ok_or_else(|| Error::msg("drv_from_store_path returned null"))?;
+            Ok(Derivation::new_raw(inner))
+        }
+    }
+
+    /// Get the Nix version string of the store daemon.
+    #[doc(alias = "nix_store_get_version")]
+    pub fn get_version(&mut self) -> Result<String> {
+        let mut r = result_string_init!();
+        unsafe {
+            check_call!(raw::store_get_version(
+                &mut self.context,
+                self.inner.ptr(),
+                Some(callback_get_result_string),
+                callback_get_result_string_data(&mut r)
+            ))
+        }?;
+        r
+    }
+
     pub fn weak_ref(&self) -> StoreWeak {
         StoreWeak {
             inner: Arc::downgrade(&self.inner),
