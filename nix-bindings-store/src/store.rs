@@ -410,6 +410,35 @@ impl Store {
         Ok(r)
     }
 
+    /// Check whether a store path is valid (exists in the store).
+    #[doc(alias = "nix_store_is_valid_path")]
+    pub fn is_valid_path(&mut self, path: &StorePath) -> bool {
+        // is_valid_path returns bool directly, not nix_err
+        unsafe { raw::store_is_valid_path(self.context.ptr(), self.inner.ptr(), path.as_ptr()) }
+    }
+
+    /// Copy a single store path from one store to another.
+    #[doc(alias = "nix_store_copy_path")]
+    pub fn copy_path(
+        &mut self,
+        dst_store: &mut Store,
+        path: &StorePath,
+        repair: bool,
+        check_sigs: bool,
+    ) -> Result<()> {
+        unsafe {
+            check_call!(raw::store_copy_path(
+                &mut self.context,
+                self.inner.ptr(),
+                dst_store.inner.ptr(),
+                path.as_ptr(),
+                repair,
+                check_sigs
+            ))?;
+        }
+        Ok(())
+    }
+
     pub fn weak_ref(&self) -> StoreWeak {
         StoreWeak {
             inner: Arc::downgrade(&self.inner),
