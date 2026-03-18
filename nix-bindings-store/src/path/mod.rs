@@ -62,7 +62,7 @@ impl StorePath {
             check_call!(raw::store_create_from_parts(
                 &mut ctx,
                 hash_part,
-                name.as_ptr() as *const i8,
+                name.as_ptr() as *const std::ffi::c_char,
                 name.len()
             ))?
         };
