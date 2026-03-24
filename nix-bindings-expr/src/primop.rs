@@ -1,4 +1,4 @@
-use crate::eval_state::{EvalState, EvalStateWeak};
+use crate::eval_state::EvalState;
 use crate::value::Value;
 use anyhow::Result;
 use nix_bindings_expr_sys as raw;
@@ -54,27 +54,28 @@ pub struct PrimOpMeta<'a, const N: usize> {
     pub args: [&'a CStr; N],
 }
 
-pub struct PrimOp {
-    pub(crate) ptr: *mut raw::PrimOp,
+pub struct PrimOp<'a> {
+    ptr: *mut raw::PrimOp,
+    eval_state: &'a mut EvalState,
 }
-impl Drop for PrimOp {
+impl Drop for PrimOp<'_> {
     fn drop(&mut self) {
         unsafe {
             raw::gc_decref(null_mut(), self.ptr as *mut c_void);
         }
     }
 }
-impl PrimOp {
+impl<'a> PrimOp<'a> {
     /// Create a new primop with the given metadata and implementation.
     ///
     /// When `f` returns an `Err`, the error is propagated to the Nix evaluator.
     /// To return a [recoverable error](RecoverableError), include it in the
     /// error chain (e.g. `Err(RecoverableError::new("...").into())`).
     pub fn new<const N: usize>(
-        eval_state: &mut EvalState,
+        eval_state: &'a mut EvalState,
         meta: PrimOpMeta<N>,
         f: Box<dyn Fn(&mut EvalState, &[Value; N]) -> Result<Value>>,
-    ) -> Result<PrimOp> {
+    ) -> Result<PrimOp<'a>> {
         assert!(N != 0);
 
         let mut args = Vec::new();
@@ -91,7 +92,7 @@ impl PrimOp {
             let user_data = ManuallyDrop::new(Box::new(PrimOpContext {
                 arity: N,
                 function: Box::new(move |eval_state, args| f(eval_state, args.try_into().unwrap())),
-                eval_state: eval_state.weak_ref(),
+                eval_state,
             }));
             user_data.as_ref() as *const PrimOpContext as *mut c_void
         };
@@ -106,15 +107,44 @@ impl PrimOp {
                 user_data
             ))?
         };
-        Ok(PrimOp { ptr: op })
+
+        Ok(PrimOp {
+            ptr: op,
+            eval_state,
+        })
+    }
+
+    /// Creates a new [`function`](crate::value::ValueType::Function) Nix value implemented by a Rust function.
+    ///
+    /// This is also known as a "primop" in Nix, short for primitive operation.
+    /// Most of the `builtins.*` values are examples of primops, but this function
+    /// does not affect `builtins`.
+    #[doc(alias = "make_primop")]
+    #[doc(alias = "create_function")]
+    #[doc(alias = "builtin")]
+    pub fn new_value(mut self) -> Result<Value> {
+        self.with_state_and_ptr(|ptr, this| {
+            let value = this.new_value_uninitialized()?;
+            unsafe {
+                check_call!(raw::init_primop(&mut this.context, value.raw_ptr(), ptr))?;
+            };
+            Ok(value)
+        })
+    }
+
+    pub(crate) fn with_state_and_ptr<F, T>(&mut self, f: F) -> T
+    where
+        F: Fn(*mut raw::PrimOp, &mut EvalState) -> T,
+    {
+        f(self.ptr, self.eval_state)
     }
 }
 
 /// The user_data for our Nix primops
-struct PrimOpContext {
+struct PrimOpContext<'a> {
     arity: usize,
     function: Box<dyn Fn(&mut EvalState, &[Value]) -> Result<Value>>,
-    eval_state: EvalStateWeak,
+    eval_state: &'a mut EvalState,
 }
 
 unsafe extern "C" fn function_adapter(
@@ -124,10 +154,7 @@ unsafe extern "C" fn function_adapter(
     args: *mut *mut raw::Value,
     ret: *mut raw::Value,
 ) {
-    let primop_info = (user_data as *const PrimOpContext).as_ref().unwrap();
-    let mut eval_state = primop_info.eval_state.upgrade().unwrap_or_else(|| {
-        panic!("Nix primop called after EvalState was dropped");
-    });
+    let primop_info = (user_data as *mut PrimOpContext).as_mut().unwrap();
     let args_raw_slice = unsafe { std::slice::from_raw_parts(args, primop_info.arity) };
     let args_vec: Vec<Value> = args_raw_slice
         .iter()
@@ -135,7 +162,7 @@ unsafe extern "C" fn function_adapter(
         .collect();
     let args_slice = args_vec.as_slice();
 
-    let r = primop_info.function.as_ref()(&mut eval_state, args_slice);
+    let r = primop_info.function.as_ref()(primop_info.eval_state, args_slice);
 
     match r {
         Ok(v) => unsafe {
