@@ -5,7 +5,6 @@ use nix_bindings_expr_sys as raw;
 use nix_bindings_util::check_call;
 use nix_bindings_util_sys as raw_util;
 use std::ffi::{c_int, c_void, CStr, CString};
-use std::mem::ManuallyDrop;
 use std::ptr::{null, null_mut};
 
 /// A primop error that is not memoized in the thunk that triggered it,
@@ -89,12 +88,12 @@ impl<'a> PrimOp<'a> {
         let user_data = {
             // We'll be leaking this Box.
             // TODO: Use the GC with finalizer, if possible.
-            let user_data = ManuallyDrop::new(Box::new(PrimOpContext {
+            let user_data = Box::leak(Box::new(PrimOpContext {
                 arity: N,
                 function: Box::new(move |eval_state, args| f(eval_state, args.try_into().unwrap())),
                 eval_state,
             }));
-            user_data.as_ref() as *const PrimOpContext as *mut c_void
+            user_data as *const PrimOpContext as *mut c_void
         };
         let op = unsafe {
             check_call!(raw::alloc_primop(
