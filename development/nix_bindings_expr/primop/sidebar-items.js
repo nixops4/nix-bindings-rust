@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["PrimOp","PrimOpMeta"]};
+window.SIDEBAR_ITEMS = {"struct":["PrimOp","PrimOpMeta","RecoverableError"]};
