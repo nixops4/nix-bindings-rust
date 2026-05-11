@@ -17,6 +17,8 @@ use std::sync::{Arc, LazyLock, Mutex, Weak};
 #[cfg(nix_at_least = "2.33.0pre")]
 use crate::derivation::Derivation;
 use crate::path::StorePath;
+#[cfg(nix_at_least = "2.35.0pre")]
+use crate::path_info::PathInfo;
 
 /* TODO make Nix itself thread safe */
 static INIT: LazyLock<Result<()>> = LazyLock::new(|| unsafe {
@@ -408,6 +410,26 @@ impl Store {
             ))
         }?;
         Ok(r)
+    }
+
+    /// Query path info for a store path.
+    ///
+    /// **Requires Nix 2.35 or later.**
+    ///
+    /// Returns the [`PathInfo`] for a path that exists in the store.
+    #[cfg(nix_at_least = "2.35.0pre")]
+    #[doc(alias = "nix_store_query_path_info")]
+    pub fn query_path_info(&mut self, path: &StorePath) -> Result<PathInfo> {
+        unsafe {
+            let ptr = check_call!(raw::store_query_path_info(
+                &mut self.context,
+                self.inner.ptr(),
+                path.as_ptr()
+            ))?;
+            let inner = NonNull::new(ptr)
+                .ok_or_else(|| Error::msg("store_query_path_info returned null"))?;
+            Ok(PathInfo::new_raw(inner))
+        }
     }
 
     pub fn weak_ref(&self) -> StoreWeak {
@@ -985,6 +1007,56 @@ mod tests {
         assert!(
             !out_in_closure,
             "Output path should not be in closure when flip_direction=true"
+        );
+
+        drop(store);
+        drop(temp_dir);
+    }
+
+    #[test]
+    #[cfg(nix_at_least = "2.35.0pre")]
+    fn query_path_info() {
+        let (mut store, temp_dir) = create_temp_store();
+        let drv_json = create_test_derivation_json();
+        let drv = store.derivation_from_json(&drv_json.to_string()).unwrap();
+        let drv_path = store.add_derivation(&drv).unwrap();
+
+        let outputs = store.realise(&drv_path).unwrap();
+        let out_path = &outputs["out"];
+
+        let info = store.query_path_info(out_path).unwrap();
+
+        let nar_hash = info.nar_hash().unwrap();
+        assert!(
+            nar_hash.starts_with("sha256:"),
+            "Expected sha256 nar hash, got: {nar_hash}"
+        );
+
+        let nar_size = info.nar_size().unwrap();
+        assert!(nar_size > 0, "Expected non-zero nar_size, got {nar_size}");
+
+        let refs = info.references().unwrap();
+        assert!(refs.is_empty(), "Expected no references for simple path");
+
+        let deriver = info.deriver().unwrap();
+        assert!(deriver.is_some(), "Expected a deriver");
+        assert!(deriver.unwrap().name().unwrap().ends_with(".drv"));
+
+        let sigs = info.sigs().unwrap();
+        assert!(
+            sigs.is_empty(),
+            "Expected no sigs on unsigned local store path"
+        );
+
+        let ca = info.ca().unwrap();
+        let ca_str = ca.expect("Expected CA for content-addressed derivation output");
+        assert!(
+            !ca_str.is_empty(),
+            "Expected non-empty CA string, got empty string"
+        );
+        assert!(
+            ca_str.starts_with("fixed:"),
+            "Expected CA to start with 'fixed:', got: {ca_str}"
         );
 
         drop(store);
