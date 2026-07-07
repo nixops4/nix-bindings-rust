@@ -136,7 +136,7 @@ use cstr::cstr;
 use nix_bindings_bdwgc_sys as gc;
 use nix_bindings_expr_sys as raw;
 use nix_bindings_store::path::StorePath;
-use nix_bindings_store::store::{Store, StoreWeak};
+use nix_bindings_store::store::Store;
 use nix_bindings_store_sys as raw_store;
 use nix_bindings_util::context::Context;
 use nix_bindings_util::string_return::{
@@ -147,7 +147,7 @@ use std::ffi::{c_char, CString};
 use std::iter::FromIterator;
 use std::os::raw::c_uint;
 use std::ptr::{null, null_mut, NonNull};
-use std::sync::{Arc, LazyLock, Weak};
+use std::sync::LazyLock;
 
 static INIT: LazyLock<Result<()>> = LazyLock::new(|| unsafe {
     gc::GC_allow_register_threads();
@@ -176,26 +176,7 @@ pub struct RealisedString {
     pub paths: Vec<StorePath>,
 }
 
-/// A [Weak] reference to an [EvalState].
-pub struct EvalStateWeak {
-    inner: Weak<EvalStateRef>,
-    store: StoreWeak,
-}
-impl EvalStateWeak {
-    /// Upgrade the weak reference to a proper [EvalState].
-    ///
-    /// If no normal reference to the [EvalState] is around anymore elsewhere, this fails by returning `None`.
-    pub fn upgrade(&self) -> Option<EvalState> {
-        self.inner.upgrade().and_then(|eval_state| {
-            self.store.upgrade().map(|store| EvalState {
-                eval_state,
-                store,
-                context: Context::new(),
-            })
-        })
-    }
-}
-
+#[clippy::has_significant_drop]
 struct EvalStateRef {
     eval_state: NonNull<raw::EvalState>,
 }
@@ -331,11 +312,11 @@ impl EvalStateBuilder {
         let eval_state =
             unsafe { check_call!(raw::eval_state_build(&mut context, self.eval_state_builder)) }?;
         Ok(EvalState {
-            eval_state: Arc::new(EvalStateRef {
+            eval_state: EvalStateRef {
                 eval_state: NonNull::new(eval_state).unwrap_or_else(|| {
                     panic!("nix_state_create returned a null pointer without an error")
                 }),
-            }),
+            },
             store: self.store.clone(),
             context,
         })
@@ -351,8 +332,13 @@ impl EvalStateBuilder {
     }
 }
 
+/// An abstraction over the underlying eval state.
+///
+/// When an `EvalState` is constructed, it will allocate a number of threads to be used for
+/// evaluating expressions. These threads will remain allocated until the `EvalState` is dropped.
+#[clippy::has_significant_drop]
 pub struct EvalState {
-    eval_state: Arc<EvalStateRef>,
+    eval_state: EvalStateRef,
     store: Store,
     pub(crate) context: Context,
 }
@@ -378,14 +364,6 @@ impl EvalState {
     /// Returns a reference to the Store that's used for instantiation, import from derivation, etc.
     pub fn store(&self) -> &Store {
         &self.store
-    }
-
-    /// Creates a weak reference to this EvalState.
-    pub fn weak_ref(&self) -> EvalStateWeak {
-        EvalStateWeak {
-            inner: Arc::downgrade(&self.eval_state),
-            store: self.store.weak_ref(),
-        }
     }
 
     /// Parses and evaluates a Nix expression `expr`.
@@ -842,7 +820,7 @@ impl EvalState {
             Box::new(move |eval_state, _dummy: &[Value; 1]| f(eval_state)),
         )?;
 
-        let p = self.new_value_primop(primop)?;
+        let p = primop.new_value()?;
         self.new_value_apply(&p, &p)
     }
 
@@ -1035,7 +1013,7 @@ impl EvalState {
         Ok(value)
     }
 
-    fn new_value_uninitialized(&mut self) -> Result<Value> {
+    pub(crate) fn new_value_uninitialized(&mut self) -> Result<Value> {
         unsafe {
             let value = check_call!(raw::alloc_value(
                 &mut self.context,
@@ -1050,19 +1028,17 @@ impl EvalState {
     /// This is also known as a "primop" in Nix, short for primitive operation.
     /// Most of the `builtins.*` values are examples of primops, but this function
     /// does not affect `builtins`.
+    ///
+    /// # Deprecated
+    ///
+    /// This function is deprecated and has been replaced by
+    /// [`PrimOp::new_value`](crate::primop::PrimOp::new_value).
     #[doc(alias = "make_primop")]
     #[doc(alias = "create_function")]
     #[doc(alias = "builtin")]
-    pub fn new_value_primop(&mut self, primop: primop::PrimOp) -> Result<Value> {
-        let value = self.new_value_uninitialized()?;
-        unsafe {
-            check_call!(raw::init_primop(
-                &mut self.context,
-                value.raw_ptr(),
-                primop.ptr
-            ))?;
-        };
-        Ok(value)
+    #[deprecated = "use `PrimOp::new_value` instead"]
+    pub fn new_value_primop(primop: primop::PrimOp) -> Result<Value> {
+        primop.new_value()
     }
 
     /// Creates a new [attribute set][`ValueType::AttrSet`] Nix value from an iterator of name-value pairs.
@@ -1220,16 +1196,6 @@ pub fn gc_register_my_thread() -> Result<ThreadRegistrationGuard> {
     }
 }
 
-impl Clone for EvalState {
-    fn clone(&self) -> Self {
-        EvalState {
-            eval_state: self.eval_state.clone(),
-            store: self.store.clone(),
-            context: Context::new(),
-        }
-    }
-}
-
 /// Initialize the Nix library for testing. This includes some modifications to the Nix settings, that must not be used in production.
 /// Use at your own peril, in rust test suites.
 #[doc(alias = "test_initialize")]
@@ -1294,33 +1260,6 @@ mod tests {
             // very basic test: make sure initialization doesn't crash
             let store = Store::open(None, HashMap::new()).unwrap();
             let _e = EvalState::new(store, []).unwrap();
-        })
-        .unwrap();
-    }
-
-    #[test]
-    fn weak_ref() {
-        gc_registering_current_thread(|| {
-            let store = Store::open(None, HashMap::new()).unwrap();
-            let es = EvalState::new(store, []).unwrap();
-            let weak = es.weak_ref();
-            let _es = weak.upgrade().unwrap();
-        })
-        .unwrap();
-    }
-
-    #[test]
-    fn weak_ref_gone() {
-        gc_registering_current_thread(|| {
-            let weak = {
-                // Use a slightly different URL which is unique in the test suite, to bypass the global store cache
-                let store = Store::open(Some("auto?foo=bar"), HashMap::new()).unwrap();
-                let es = EvalState::new(store, []).unwrap();
-                es.weak_ref()
-            };
-            assert!(weak.upgrade().is_none());
-            assert!(weak.store.upgrade().is_none());
-            assert!(weak.inner.upgrade().is_none());
         })
         .unwrap();
     }
@@ -2252,7 +2191,7 @@ mod tests {
             )
             .unwrap();
 
-            let f = es.new_value_primop(primop).unwrap();
+            let f = primop.new_value().unwrap();
 
             {
                 *bias_control.lock().unwrap() = 10;
@@ -2291,7 +2230,7 @@ mod tests {
                 )
                 .unwrap();
 
-                es.new_value_primop(prim)
+                prim.new_value()
             }
             .unwrap();
             let a = es.new_value_int(2).unwrap();
@@ -2382,7 +2321,7 @@ mod tests {
                 }),
             )
             .unwrap();
-            let f = es.new_value_primop(primop).unwrap();
+            let f = primop.new_value().unwrap();
             let a = es.new_value_int(2).unwrap();
             let b = es.new_value_int(3).unwrap();
             let fa = es.call(f, a).unwrap();
@@ -2411,7 +2350,7 @@ mod tests {
                 Box::new(|_es, _args| bail!("The frob unexpectedly fizzled")),
             )
             .unwrap();
-            let f = es.new_value_primop(primop).unwrap();
+            let f = primop.new_value().unwrap();
             let a = es.new_value_int(0).unwrap();
             match es.call(f, a) {
                 Ok(_) => panic!("expected an error"),
