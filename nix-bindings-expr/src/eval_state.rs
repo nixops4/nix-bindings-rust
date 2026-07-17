@@ -10,7 +10,7 @@
 //! - Type-safe value extraction with [`require_*`](EvalState#implementations) methods
 //! - Memory management and garbage collection integration
 //! - Store integration for derivations and store paths
-//! - Custom function creation with [`new_value_primop`](EvalState::new_value_primop) and [`new_value_thunk`](EvalState::new_value_thunk)
+//! - Custom function creation with [`PrimOp`](crate::primop::PrimOp) and [`new_value_thunk`](EvalState::new_value_thunk)
 //!
 //! ### Construction
 //!
@@ -136,7 +136,7 @@ use cstr::cstr;
 use nix_bindings_bdwgc_sys as gc;
 use nix_bindings_expr_sys as raw;
 use nix_bindings_store::path::StorePath;
-use nix_bindings_store::store::{Store, StoreWeak};
+use nix_bindings_store::store::Store;
 use nix_bindings_store_sys as raw_store;
 use nix_bindings_util::context::Context;
 use nix_bindings_util::string_return::{
@@ -179,19 +179,15 @@ pub struct RealisedString {
 /// A [Weak] reference to an [EvalState].
 pub struct EvalStateWeak {
     inner: Weak<EvalStateRef>,
-    store: StoreWeak,
 }
 impl EvalStateWeak {
     /// Upgrade the weak reference to a proper [EvalState].
     ///
     /// If no normal reference to the [EvalState] is around anymore elsewhere, this fails by returning `None`.
     pub fn upgrade(&self) -> Option<EvalState> {
-        self.inner.upgrade().and_then(|eval_state| {
-            self.store.upgrade().map(|store| EvalState {
-                eval_state,
-                store,
-                context: Context::new(),
-            })
+        self.inner.upgrade().map(|eval_state| EvalState {
+            eval_state,
+            context: Context::new(),
         })
     }
 }
@@ -374,7 +370,6 @@ impl EvalStateBuilder {
                     panic!("nix_state_create returned a null pointer without an error")
                 }),
             }),
-            store: self.store.clone(),
             context,
         })
     }
@@ -391,7 +386,6 @@ impl EvalStateBuilder {
 
 pub struct EvalState {
     eval_state: Arc<EvalStateRef>,
-    store: Store,
     pub(crate) context: Context,
 }
 impl EvalState {
@@ -413,16 +407,10 @@ impl EvalState {
         self.eval_state.as_ptr()
     }
 
-    /// Returns a reference to the Store that's used for instantiation, import from derivation, etc.
-    pub fn store(&self) -> &Store {
-        &self.store
-    }
-
     /// Creates a weak reference to this EvalState.
     pub fn weak_ref(&self) -> EvalStateWeak {
         EvalStateWeak {
             inner: Arc::downgrade(&self.eval_state),
-            store: self.store.weak_ref(),
         }
     }
 
@@ -1262,7 +1250,6 @@ impl Clone for EvalState {
     fn clone(&self) -> Self {
         EvalState {
             eval_state: self.eval_state.clone(),
-            store: self.store.clone(),
             context: Context::new(),
         }
     }
@@ -1357,7 +1344,6 @@ mod tests {
                 es.weak_ref()
             };
             assert!(weak.upgrade().is_none());
-            assert!(weak.store.upgrade().is_none());
             assert!(weak.inner.upgrade().is_none());
         })
         .unwrap();
