@@ -10,6 +10,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `EvalStateBuilder::set_setting` for configuring evaluator settings (e.g. `pure-eval`) without relying on global config state. Requires Nix >= 2.36. ([#69] by [@adisbladis])
+- `PrimOp::to_value` — attach a primop to a fresh function `Value` in a given `EvalState`. Replaces `EvalState::new_value_primop`.
+- `PrimOp::register` — register a primop as a global builtin via `nix_register_primop`, making it callable from every `EvalState` created afterwards. Statically-registered builtins were not previously expressible through the crate.
+
+### Changed
+
+- **Breaking**: `PrimOp::new` no longer takes `&mut EvalState`. Primops are now constructed independent of any evaluation state — the `EvalState` a callback runs in is derived from the eval state Nix hands to the C callback, so the same constructor covers both ad-hoc (attached via `PrimOp::to_value`) and globally-registered (`PrimOp::register`) primops.
+  Migration for nixops4-style call sites:
+  ```rust
+  // before
+  let prim = PrimOp::new(&mut es, meta, Box::new(|es, args| ...))?;
+  let f   = es.new_value_primop(prim)?;
+  // after
+  let prim = PrimOp::new(meta, Box::new(|es, args| ...))?;
+  let f   = prim.to_value(&mut es)?;
+  ```
+- **Breaking**: `EvalState` no longer implements `Clone` and no longer exposes `weak_ref()` or an `EvalStateWeak` type — the previous primop dispatch relied on those; the new dispatch uses Nix's own `EvalState *` argument instead.
+- **Breaking**: `EvalState::store()` and the internal `store` field are removed. The C API has no `nix_state_get_store`, so a primop-callback `EvalState` wrapper has no store to expose either way; callers who need the `Store` keep their own handle (as nixops4 already does).
+
+### Removed
+
+- `EvalStateWeak` and `EvalState::weak_ref` — no longer needed now that the primop callback derives its `EvalState` from Nix's callback argument.
+- `EvalState::store` accessor and `impl Clone for EvalState` — see above.
 
 ## [0.2.1] - 2026-05-16
 
