@@ -3,6 +3,7 @@ use crate::value::Value;
 use anyhow::Result;
 use nix_bindings_expr_sys as raw;
 use nix_bindings_util::check_call;
+use nix_bindings_util::context::Context;
 use nix_bindings_util_sys as raw_util;
 use std::ffi::{c_int, c_void, CStr, CString};
 use std::mem::ManuallyDrop;
@@ -55,7 +56,7 @@ pub struct PrimOpMeta<'a, const N: usize> {
 }
 
 pub struct PrimOp {
-    pub(crate) ptr: *mut raw::PrimOp,
+    ptr: *mut raw::PrimOp,
 }
 impl Drop for PrimOp {
     fn drop(&mut self) {
@@ -71,7 +72,6 @@ impl PrimOp {
     /// To return a [recoverable error](RecoverableError), include it in the
     /// error chain (e.g. `Err(RecoverableError::new("...").into())`).
     pub fn new<const N: usize>(
-        eval_state: &mut EvalState,
         meta: PrimOpMeta<N>,
         f: Box<dyn Fn(&mut EvalState, &[Value; N]) -> Result<Value>>,
     ) -> Result<PrimOp> {
@@ -94,9 +94,10 @@ impl PrimOp {
             }));
             user_data.as_ref() as *const PrimOpContext as *mut c_void
         };
+        let mut ctx = Context::new();
         let op = unsafe {
             check_call!(raw::alloc_primop(
-                &mut eval_state.context,
+                &mut ctx,
                 FUNCTION_ADAPTER,
                 N as c_int,
                 meta.name.as_ptr(),
@@ -106,6 +107,46 @@ impl PrimOp {
             ))?
         };
         Ok(PrimOp { ptr: op })
+    }
+
+    /// Creates a [function][`crate::value::ValueType::Function`] [`Value`]
+    /// backed by this primop, in the given [`EvalState`].
+    ///
+    /// Consumes the [`PrimOp`]; the resulting [`Value`] keeps the primop alive
+    /// via Nix's GC.
+    #[doc(alias = "make_primop")]
+    #[doc(alias = "create_function")]
+    #[doc(alias = "builtin")]
+    #[doc(alias = "init_primop")]
+    pub fn to_value(self, eval_state: &mut EvalState) -> Result<Value> {
+        let value = eval_state.new_value_uninitialized()?;
+        unsafe {
+            check_call!(raw::init_primop(
+                &mut eval_state.context,
+                value.raw_ptr(),
+                self.ptr
+            ))?;
+        }
+        Ok(value)
+    }
+
+    /// Registers this primop as a global builtin.
+    ///
+    /// This only affects [`EvalState`]s created *after* the call.
+    ///
+    /// The same primop must not also be attached to a value with [`PrimOp::to_value`].
+    // Implementation note:
+    // `Drop` still
+    // calls `nix_gc_decref` to release our reference — the primop content
+    // has been moved into Nix's global registry by then, per the C API
+    // contract.
+    #[doc(alias = "nix_register_primop")]
+    pub fn register(self) -> Result<()> {
+        let mut ctx = Context::new();
+        unsafe {
+            check_call!(raw::register_primop(&mut ctx, self.ptr))?;
+        }
+        Ok(())
     }
 }
 
