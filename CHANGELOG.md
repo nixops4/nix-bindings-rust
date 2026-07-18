@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `PrimOp::register_globally` — register a primop as a global builtin via `nix_register_primop`, making it callable from every `EvalState` created afterwards.
+  Nix does not support `EvalState`-scoped extensions to `builtins` as of writing.
+  This addition required some breaking changes and triggered some cleanups.
+
+### Changed
+
+- **Breaking**: `PrimOp::new` no longer takes `&mut EvalState`
+- Deprecation: `EvalState::new_value_primop` -> `PrimOp::into_value`
+  Primops are now constructed independent of any evaluation state, so that built-ins
+  can be registered ahead of `EvalState` construction, and be run in any `EvalState`
+  context.
+  Migration for ad hoc primop creation call sites:
+  ```rust
+  // before
+  let prim = PrimOp::new(&mut es, meta, Box::new(|es, args| ...))?;
+  let f   = es.new_value_primop(prim)?;
+  // after
+  let prim = PrimOp::new(meta, Box::new(|es, args| ...))?;
+  let f   = prim.into_value(&mut es)?;
+  ```
+
+### Removed
+
+- `EvalState::store()`. Consumers need to track the `Store` themselves.
+- `impl Clone for EvalState`: since a C API `EvalState` can be a borrowed one,
+   and it doesn't provide a clone function, we can't provide a safe clone operation.
+- `EvalStateWeak`: the internal `Arc` was removed; sharing is now a consumer responsibility.
+  This is more efficient and flexible, and truthful to the C API.
+- `impl Send/Sync for EvalState` the C API doesn't make these promises, so neither should
+  `nix-bindings-rust`. Thread safety is improving upstream, but if you want to take this risk,
+  it should be an intentional opt-in.
+
 ## [0.2.1] - 2026-05-16
 
 ### Added

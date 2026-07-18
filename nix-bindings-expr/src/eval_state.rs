@@ -136,7 +136,7 @@ use cstr::cstr;
 use nix_bindings_bdwgc_sys as gc;
 use nix_bindings_expr_sys as raw;
 use nix_bindings_store::path::StorePath;
-use nix_bindings_store::store::{Store, StoreWeak};
+use nix_bindings_store::store::Store;
 use nix_bindings_store_sys as raw_store;
 use nix_bindings_util::context::Context;
 use nix_bindings_util::string_return::{
@@ -147,7 +147,7 @@ use std::ffi::{c_char, CString};
 use std::iter::FromIterator;
 use std::os::raw::c_uint;
 use std::ptr::{null, null_mut, NonNull};
-use std::sync::{Arc, LazyLock, Weak};
+use std::sync::LazyLock;
 
 static INIT: LazyLock<Result<()>> = LazyLock::new(|| unsafe {
     gc::GC_allow_register_threads();
@@ -176,28 +176,10 @@ pub struct RealisedString {
     pub paths: Vec<StorePath>,
 }
 
-/// A [Weak] reference to an [EvalState].
-pub struct EvalStateWeak {
-    inner: Weak<EvalStateRef>,
-    store: StoreWeak,
-}
-impl EvalStateWeak {
-    /// Upgrade the weak reference to a proper [EvalState].
-    ///
-    /// If no normal reference to the [EvalState] is around anymore elsewhere, this fails by returning `None`.
-    pub fn upgrade(&self) -> Option<EvalState> {
-        self.inner.upgrade().and_then(|eval_state| {
-            self.store.upgrade().map(|store| EvalState {
-                eval_state,
-                store,
-                context: Context::new(),
-            })
-        })
-    }
-}
-
-struct EvalStateRef {
+pub(crate) struct EvalStateRef {
     eval_state: NonNull<raw::EvalState>,
+    /// Only `nix_state_free` on `drop` when `true`.
+    owned: bool,
 }
 impl EvalStateRef {
     /// Returns a raw pointer to the underlying EvalState.
@@ -211,8 +193,10 @@ impl EvalStateRef {
 }
 impl Drop for EvalStateRef {
     fn drop(&mut self) {
-        unsafe {
-            raw::state_free(self.eval_state.as_ptr());
+        if self.owned {
+            unsafe {
+                raw::state_free(self.eval_state.as_ptr());
+            }
         }
     }
 }
@@ -331,12 +315,12 @@ impl EvalStateBuilder {
         let eval_state =
             unsafe { check_call!(raw::eval_state_build(&mut context, self.eval_state_builder)) }?;
         Ok(EvalState {
-            eval_state: Arc::new(EvalStateRef {
+            eval_state: EvalStateRef {
                 eval_state: NonNull::new(eval_state).unwrap_or_else(|| {
                     panic!("nix_state_create returned a null pointer without an error")
                 }),
-            }),
-            store: self.store.clone(),
+                owned: true,
+            },
             context,
         })
     }
@@ -352,8 +336,7 @@ impl EvalStateBuilder {
 }
 
 pub struct EvalState {
-    eval_state: Arc<EvalStateRef>,
-    store: Store,
+    pub(crate) eval_state: EvalStateRef,
     pub(crate) context: Context,
 }
 impl EvalState {
@@ -375,16 +358,18 @@ impl EvalState {
         self.eval_state.as_ptr()
     }
 
-    /// Returns a reference to the Store that's used for instantiation, import from derivation, etc.
-    pub fn store(&self) -> &Store {
-        &self.store
-    }
-
-    /// Creates a weak reference to this EvalState.
-    pub fn weak_ref(&self) -> EvalStateWeak {
-        EvalStateWeak {
-            inner: Arc::downgrade(&self.eval_state),
-            store: self.store.weak_ref(),
+    /// Wraps a raw `EvalState *` borrowed from the Nix C API.
+    ///
+    /// # Safety
+    ///
+    /// The returned `EvalState` must not outlive the underlying pointer.
+    pub(crate) unsafe fn from_raw_borrowed(ptr: NonNull<raw::EvalState>) -> Self {
+        EvalState {
+            eval_state: EvalStateRef {
+                eval_state: ptr,
+                owned: false,
+            },
+            context: Context::new(),
         }
     }
 
@@ -830,7 +815,6 @@ impl EvalState {
         // create a function and pass it a dummy argument.
         let name = CString::new(name).with_context(|| "new_thunk: name contains null byte")?;
         let primop = primop::PrimOp::new(
-            self,
             primop::PrimOpMeta {
                 // name is observable in stack traces, ie if the thunk returns Err
                 name: name.as_c_str(),
@@ -842,7 +826,7 @@ impl EvalState {
             Box::new(move |eval_state, _dummy: &[Value; 1]| f(eval_state)),
         )?;
 
-        let p = self.new_value_primop(primop)?;
+        let p = primop.into_value(self)?;
         self.new_value_apply(&p, &p)
     }
 
@@ -1035,7 +1019,7 @@ impl EvalState {
         Ok(value)
     }
 
-    fn new_value_uninitialized(&mut self) -> Result<Value> {
+    pub(crate) fn new_value_uninitialized(&mut self) -> Result<Value> {
         unsafe {
             let value = check_call!(raw::alloc_value(
                 &mut self.context,
@@ -1045,24 +1029,9 @@ impl EvalState {
         }
     }
 
-    /// Creates a new [function][`ValueType::Function`] Nix value implemented by a Rust function.
-    ///
-    /// This is also known as a "primop" in Nix, short for primitive operation.
-    /// Most of the `builtins.*` values are examples of primops, but this function
-    /// does not affect `builtins`.
-    #[doc(alias = "make_primop")]
-    #[doc(alias = "create_function")]
-    #[doc(alias = "builtin")]
+    #[deprecated(since = "0.3.0", note = "use PrimOp::into_value")]
     pub fn new_value_primop(&mut self, primop: primop::PrimOp) -> Result<Value> {
-        let value = self.new_value_uninitialized()?;
-        unsafe {
-            check_call!(raw::init_primop(
-                &mut self.context,
-                value.raw_ptr(),
-                primop.ptr
-            ))?;
-        };
-        Ok(value)
+        primop.into_value(self)
     }
 
     /// Creates a new [attribute set][`ValueType::AttrSet`] Nix value from an iterator of name-value pairs.
@@ -1220,16 +1189,6 @@ pub fn gc_register_my_thread() -> Result<ThreadRegistrationGuard> {
     }
 }
 
-impl Clone for EvalState {
-    fn clone(&self) -> Self {
-        EvalState {
-            eval_state: self.eval_state.clone(),
-            store: self.store.clone(),
-            context: Context::new(),
-        }
-    }
-}
-
 /// Initialize the Nix library for testing. This includes some modifications to the Nix settings, that must not be used in production.
 /// Use at your own peril, in rust test suites.
 #[doc(alias = "test_initialize")]
@@ -1298,32 +1257,11 @@ mod tests {
         .unwrap();
     }
 
-    #[test]
-    fn weak_ref() {
-        gc_registering_current_thread(|| {
-            let store = Store::open(None, HashMap::new()).unwrap();
-            let es = EvalState::new(store, []).unwrap();
-            let weak = es.weak_ref();
-            let _es = weak.upgrade().unwrap();
-        })
-        .unwrap();
-    }
-
-    #[test]
-    fn weak_ref_gone() {
-        gc_registering_current_thread(|| {
-            let weak = {
-                // Use a slightly different URL which is unique in the test suite, to bypass the global store cache
-                let store = Store::open(Some("auto?foo=bar"), HashMap::new()).unwrap();
-                let es = EvalState::new(store, []).unwrap();
-                es.weak_ref()
-            };
-            assert!(weak.upgrade().is_none());
-            assert!(weak.store.upgrade().is_none());
-            assert!(weak.inner.upgrade().is_none());
-        })
-        .unwrap();
-    }
+    // Nix is not thread safe yet.
+    // When it is, and the C API documentation supports that claim, these could
+    // be implemented.
+    // Until then, if you want to take the risk, you'll have to use `unsafe`.
+    static_assertions::assert_not_impl_any!(EvalState: Send, Sync);
 
     #[test]
     fn eval_state_lookup_path() {
@@ -2237,7 +2175,6 @@ mod tests {
             let bias_control = bias.clone();
 
             let primop = primop::PrimOp::new(
-                &mut es,
                 primop::PrimOpMeta {
                     name: cstr!("testFunction"),
                     args: [cstr!("a"), cstr!("b")],
@@ -2252,7 +2189,7 @@ mod tests {
             )
             .unwrap();
 
-            let f = es.new_value_primop(primop).unwrap();
+            let f = primop.into_value(&mut es).unwrap();
 
             {
                 *bias_control.lock().unwrap() = 10;
@@ -2276,9 +2213,7 @@ mod tests {
             let store = Store::open(None, []).unwrap();
             let mut es = EvalState::new(store, []).unwrap();
             let f = {
-                let es: &mut EvalState = &mut es;
                 let prim = primop::PrimOp::new(
-                    es,
                     primop::PrimOpMeta {
                         name: cstr!("throwingTestFunction"),
                         args: [cstr!("arg")],
@@ -2291,7 +2226,7 @@ mod tests {
                 )
                 .unwrap();
 
-                es.new_value_primop(prim)
+                prim.into_value(&mut es)
             }
             .unwrap();
             let a = es.new_value_int(2).unwrap();
@@ -2369,7 +2304,6 @@ mod tests {
             let store = Store::open(None, []).unwrap();
             let mut es = EvalState::new(store, []).unwrap();
             let primop = primop::PrimOp::new(
-                &mut es,
                 primop::PrimOpMeta {
                     name: cstr!("frobnicate"),
                     doc: cstr!("Frobnicates widgets"),
@@ -2382,7 +2316,7 @@ mod tests {
                 }),
             )
             .unwrap();
-            let f = es.new_value_primop(primop).unwrap();
+            let f = primop.into_value(&mut es).unwrap();
             let a = es.new_value_int(2).unwrap();
             let b = es.new_value_int(3).unwrap();
             let fa = es.call(f, a).unwrap();
@@ -2402,7 +2336,6 @@ mod tests {
             let store = Store::open(None, []).unwrap();
             let mut es = EvalState::new(store, []).unwrap();
             let primop = primop::PrimOp::new(
-                &mut es,
                 primop::PrimOpMeta {
                     name: cstr!("frobnicate"),
                     doc: cstr!("Frobnicates widgets"),
@@ -2411,7 +2344,7 @@ mod tests {
                 Box::new(|_es, _args| bail!("The frob unexpectedly fizzled")),
             )
             .unwrap();
-            let f = es.new_value_primop(primop).unwrap();
+            let f = primop.into_value(&mut es).unwrap();
             let a = es.new_value_int(0).unwrap();
             match es.call(f, a) {
                 Ok(_) => panic!("expected an error"),
@@ -2919,6 +2852,38 @@ mod tests {
             es.force(&v).unwrap();
             let i = es.require_int(&v).unwrap();
             assert_eq!(i, 42);
+        })
+        .unwrap();
+    }
+
+    // Note: `nix_register_primop` has process-global effect that persists for
+    // the remaining test executions.
+    #[test]
+    fn eval_state_primop_register_builtin() {
+        gc_registering_current_thread(|| {
+            let primop = primop::PrimOp::new(
+                primop::PrimOpMeta {
+                    name: cstr!("__test_answer"),
+                    doc: cstr!("Returns the answer to life, the universe, and everything."),
+                    args: [cstr!("_ignored")],
+                },
+                Box::new(|es, _args| es.new_value_int(42)),
+            )
+            .unwrap();
+            primop.register_globally().unwrap();
+
+            // Fresh EvalState created *after* register — this is what
+            // registered builtins must be usable from.
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            // Top-level: the `__`-prefixed name is exposed in the base env.
+            let v = es.eval_from_string("__test_answer null", "<test>").unwrap();
+            assert_eq!(es.require_int(&v).unwrap(), 42);
+            // `builtins.*`: Nix strips the leading `__` when populating it.
+            let v = es
+                .eval_from_string("builtins.test_answer null", "<test>")
+                .unwrap();
+            assert_eq!(es.require_int(&v).unwrap(), 42);
         })
         .unwrap();
     }
