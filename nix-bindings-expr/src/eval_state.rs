@@ -192,8 +192,11 @@ impl EvalStateWeak {
     }
 }
 
-struct EvalStateRef {
+pub(crate) struct EvalStateRef {
     eval_state: NonNull<raw::EvalState>,
+    /// When `true`, `Drop` calls `nix_state_free`.
+    /// When `false`, the pointer is borrowed (e.g. from a primop callback's transient wrapper) and must not be freed.
+    owned: bool,
 }
 impl EvalStateRef {
     /// Returns a raw pointer to the underlying EvalState.
@@ -207,8 +210,10 @@ impl EvalStateRef {
 }
 impl Drop for EvalStateRef {
     fn drop(&mut self) {
-        unsafe {
-            raw::state_free(self.eval_state.as_ptr());
+        if self.owned {
+            unsafe {
+                raw::state_free(self.eval_state.as_ptr());
+            }
         }
     }
 }
@@ -369,6 +374,7 @@ impl EvalStateBuilder {
                 eval_state: NonNull::new(eval_state).unwrap_or_else(|| {
                     panic!("nix_state_create returned a null pointer without an error")
                 }),
+                owned: true,
             }),
             context,
         })
@@ -411,6 +417,21 @@ impl EvalState {
     pub fn weak_ref(&self) -> EvalStateWeak {
         EvalStateWeak {
             inner: Arc::downgrade(&self.eval_state),
+        }
+    }
+
+    /// Wraps a raw `EvalState *` borrowed from the Nix C API.
+    ///
+    /// # Safety
+    ///
+    /// The returned `EvalState` must not outlive the underlying pointer.
+    pub(crate) unsafe fn from_raw_borrowed(ptr: NonNull<raw::EvalState>) -> Self {
+        EvalState {
+            eval_state: Arc::new(EvalStateRef {
+                eval_state: ptr,
+                owned: false,
+            }),
+            context: Context::new(),
         }
     }
 

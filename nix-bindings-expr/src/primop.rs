@@ -1,4 +1,4 @@
-use crate::eval_state::{EvalState, EvalStateWeak};
+use crate::eval_state::EvalState;
 use crate::value::Value;
 use anyhow::Result;
 use nix_bindings_expr_sys as raw;
@@ -6,7 +6,7 @@ use nix_bindings_util::check_call;
 use nix_bindings_util_sys as raw_util;
 use std::ffi::{c_int, c_void, CStr, CString};
 use std::mem::ManuallyDrop;
-use std::ptr::{null, null_mut};
+use std::ptr::{null, null_mut, NonNull};
 
 /// A primop error that is not memoized in the thunk that triggered it,
 /// allowing the thunk to be forced again.
@@ -91,7 +91,6 @@ impl PrimOp {
             let user_data = ManuallyDrop::new(Box::new(PrimOpContext {
                 arity: N,
                 function: Box::new(move |eval_state, args| f(eval_state, args.try_into().unwrap())),
-                eval_state: eval_state.weak_ref(),
             }));
             user_data.as_ref() as *const PrimOpContext as *mut c_void
         };
@@ -114,20 +113,19 @@ impl PrimOp {
 struct PrimOpContext {
     arity: usize,
     function: Box<dyn Fn(&mut EvalState, &[Value]) -> Result<Value>>,
-    eval_state: EvalStateWeak,
 }
 
 unsafe extern "C" fn function_adapter(
     user_data: *mut ::std::os::raw::c_void,
     context_out: *mut raw_util::c_context,
-    _state: *mut raw::EvalState,
+    state: *mut raw::EvalState,
     args: *mut *mut raw::Value,
     ret: *mut raw::Value,
 ) {
     let primop_info = (user_data as *const PrimOpContext).as_ref().unwrap();
-    let mut eval_state = primop_info.eval_state.upgrade().unwrap_or_else(|| {
-        panic!("Nix primop called after EvalState was dropped");
-    });
+    let mut eval_state = EvalState::from_raw_borrowed(
+        NonNull::new(state).expect("Nix primop callback given null EvalState pointer"),
+    );
     let args_raw_slice = unsafe { std::slice::from_raw_parts(args, primop_info.arity) };
     let args_vec: Vec<Value> = args_raw_slice
         .iter()
@@ -136,6 +134,10 @@ unsafe extern "C" fn function_adapter(
     let args_slice = args_vec.as_slice();
 
     let r = primop_info.function.as_ref()(&mut eval_state, args_slice);
+
+    // Do not keep. See `EvalState::from_raw_borrowed` safety section.
+    // The original Nix C API `EvalState *` wrapper may be transient.
+    drop(eval_state);
 
     match r {
         Ok(v) => unsafe {
