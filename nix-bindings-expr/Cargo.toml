@@ -28,6 +28,9 @@ cstr = "0.2"
 pkg-config = "0.3"
 nix-bindings-util = { path = "../nix-bindings-util", version = "0.2.2" }
 
+[dev-dependencies]
+static_assertions = "1.1"
+
 [lints.rust]
 warnings = "deny"
 dead-code = "allow"
