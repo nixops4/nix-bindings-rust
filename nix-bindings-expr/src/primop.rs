@@ -3,6 +3,7 @@ use crate::value::Value;
 use anyhow::Result;
 use nix_bindings_expr_sys as raw;
 use nix_bindings_util::check_call;
+use nix_bindings_util::context::Context;
 use nix_bindings_util_sys as raw_util;
 use std::ffi::{c_int, c_void, CStr, CString};
 use std::mem::ManuallyDrop;
@@ -55,7 +56,7 @@ pub struct PrimOpMeta<'a, const N: usize> {
 }
 
 pub struct PrimOp {
-    pub(crate) ptr: *mut raw::PrimOp,
+    ptr: *mut raw::PrimOp,
 }
 impl Drop for PrimOp {
     fn drop(&mut self) {
@@ -67,11 +68,13 @@ impl Drop for PrimOp {
 impl PrimOp {
     /// Create a new primop with the given metadata and implementation.
     ///
+    /// The primop is not tied to an [`EvalState`]; the callback argument comes
+    /// directly from Nix.
+    ///
     /// When `f` returns an `Err`, the error is propagated to the Nix evaluator.
     /// To return a [recoverable error](RecoverableError), include it in the
     /// error chain (e.g. `Err(RecoverableError::new("...").into())`).
     pub fn new<const N: usize>(
-        eval_state: &mut EvalState,
         meta: PrimOpMeta<N>,
         f: Box<dyn Fn(&mut EvalState, &[Value; N]) -> Result<Value>>,
     ) -> Result<PrimOp> {
@@ -94,9 +97,10 @@ impl PrimOp {
             }));
             user_data.as_ref() as *const PrimOpContext as *mut c_void
         };
+        let mut ctx = Context::new();
         let op = unsafe {
             check_call!(raw::alloc_primop(
-                &mut eval_state.context,
+                &mut ctx,
                 FUNCTION_ADAPTER,
                 N as c_int,
                 meta.name.as_ptr(),
@@ -106,6 +110,44 @@ impl PrimOp {
             ))?
         };
         Ok(PrimOp { ptr: op })
+    }
+
+    /// Creates a [function][`crate::value::ValueType::Function`] [`Value`]
+    /// backed by this primop, in the given [`EvalState`].
+    ///
+    /// Consumes the [`PrimOp`] as ownership moves to the Nix GC. The returned
+    /// [`Value`] or other references in the Nix heap keep it alive.
+    ///
+    /// This fully consumes the `PrimOp` because the C API leaves it invalid.
+    #[doc(alias = "make_primop")]
+    #[doc(alias = "create_function")]
+    #[doc(alias = "builtin")]
+    #[doc(alias = "init_primop")]
+    pub fn into_value(self, eval_state: &mut EvalState) -> Result<Value> {
+        let value = eval_state.new_value_uninitialized()?;
+        unsafe {
+            check_call!(raw::init_primop(
+                &mut eval_state.context,
+                value.raw_ptr(),
+                self.ptr
+            ))?;
+        }
+        Ok(value)
+    }
+
+    /// Registers this primop into future `EvalState`s.
+    ///
+    /// Per the Nix C API (`nix_register_primop`), this only affects
+    /// [`EvalState`]s created *after* the call.
+    ///
+    /// This fully consumes the `PrimOp` because the C API leaves it invalid.
+    #[doc(alias = "nix_register_primop")]
+    pub fn register_globally(self) -> Result<()> {
+        let mut ctx = Context::new();
+        unsafe {
+            check_call!(raw::register_primop(&mut ctx, self.ptr))?;
+        }
+        Ok(())
     }
 }
 
