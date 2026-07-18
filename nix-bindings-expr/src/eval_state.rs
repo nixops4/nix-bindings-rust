@@ -147,7 +147,7 @@ use std::ffi::{c_char, CString};
 use std::iter::FromIterator;
 use std::os::raw::c_uint;
 use std::ptr::{null, null_mut, NonNull};
-use std::sync::{Arc, LazyLock, Weak};
+use std::sync::LazyLock;
 
 static INIT: LazyLock<Result<()>> = LazyLock::new(|| unsafe {
     gc::GC_allow_register_threads();
@@ -174,22 +174,6 @@ pub struct RealisedString {
     pub s: String,
     /// Store paths referenced by the string.
     pub paths: Vec<StorePath>,
-}
-
-/// A [Weak] reference to an [EvalState].
-pub struct EvalStateWeak {
-    inner: Weak<EvalStateRef>,
-}
-impl EvalStateWeak {
-    /// Upgrade the weak reference to a proper [EvalState].
-    ///
-    /// If no normal reference to the [EvalState] is around anymore elsewhere, this fails by returning `None`.
-    pub fn upgrade(&self) -> Option<EvalState> {
-        self.inner.upgrade().map(|eval_state| EvalState {
-            eval_state,
-            context: Context::new(),
-        })
-    }
 }
 
 pub(crate) struct EvalStateRef {
@@ -331,12 +315,12 @@ impl EvalStateBuilder {
         let eval_state =
             unsafe { check_call!(raw::eval_state_build(&mut context, self.eval_state_builder)) }?;
         Ok(EvalState {
-            eval_state: Arc::new(EvalStateRef {
+            eval_state: EvalStateRef {
                 eval_state: NonNull::new(eval_state).unwrap_or_else(|| {
                     panic!("nix_state_create returned a null pointer without an error")
                 }),
                 owned: true,
-            }),
+            },
             context,
         })
     }
@@ -352,7 +336,7 @@ impl EvalStateBuilder {
 }
 
 pub struct EvalState {
-    eval_state: Arc<EvalStateRef>,
+    pub(crate) eval_state: EvalStateRef,
     pub(crate) context: Context,
 }
 impl EvalState {
@@ -374,13 +358,6 @@ impl EvalState {
         self.eval_state.as_ptr()
     }
 
-    /// Creates a weak reference to this EvalState.
-    pub fn weak_ref(&self) -> EvalStateWeak {
-        EvalStateWeak {
-            inner: Arc::downgrade(&self.eval_state),
-        }
-    }
-
     /// Wraps a raw `EvalState *` borrowed from the Nix C API.
     ///
     /// # Safety
@@ -388,10 +365,10 @@ impl EvalState {
     /// The returned `EvalState` must not outlive the underlying pointer.
     pub(crate) unsafe fn from_raw_borrowed(ptr: NonNull<raw::EvalState>) -> Self {
         EvalState {
-            eval_state: Arc::new(EvalStateRef {
+            eval_state: EvalStateRef {
                 eval_state: ptr,
                 owned: false,
-            }),
+            },
             context: Context::new(),
         }
     }
@@ -1228,15 +1205,6 @@ pub fn gc_register_my_thread() -> Result<ThreadRegistrationGuard> {
     }
 }
 
-impl Clone for EvalState {
-    fn clone(&self) -> Self {
-        EvalState {
-            eval_state: self.eval_state.clone(),
-            context: Context::new(),
-        }
-    }
-}
-
 /// Initialize the Nix library for testing. This includes some modifications to the Nix settings, that must not be used in production.
 /// Use at your own peril, in rust test suites.
 #[doc(alias = "test_initialize")]
@@ -1305,31 +1273,11 @@ mod tests {
         .unwrap();
     }
 
-    #[test]
-    fn weak_ref() {
-        gc_registering_current_thread(|| {
-            let store = Store::open(None, HashMap::new()).unwrap();
-            let es = EvalState::new(store, []).unwrap();
-            let weak = es.weak_ref();
-            let _es = weak.upgrade().unwrap();
-        })
-        .unwrap();
-    }
-
-    #[test]
-    fn weak_ref_gone() {
-        gc_registering_current_thread(|| {
-            let weak = {
-                // Use a slightly different URL which is unique in the test suite, to bypass the global store cache
-                let store = Store::open(Some("auto?foo=bar"), HashMap::new()).unwrap();
-                let es = EvalState::new(store, []).unwrap();
-                es.weak_ref()
-            };
-            assert!(weak.upgrade().is_none());
-            assert!(weak.inner.upgrade().is_none());
-        })
-        .unwrap();
-    }
+    // Nix is not thread safe yet.
+    // When it is, and the C API documentation supports that claim, these could
+    // be implemented.
+    // Until then, if you want to take the risk, you'll have to use `unsafe`.
+    static_assertions::assert_not_impl_any!(EvalState: Send, Sync);
 
     #[test]
     fn eval_state_lookup_path() {

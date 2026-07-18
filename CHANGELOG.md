@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `EvalState::store()`. Consumers need to track the `Store` themselves.
+- `impl Clone for EvalState`: since a C API `EvalState` can be a borrowed one,
+   and it doesn't provide a clone function, we can't provide a safe clone operation.
+- `EvalStateWeak`: the internal `Arc` was removed; sharing is now a consumer responsibility.
+  This is more efficient and flexible, and truthful to the C API.
+- `impl Send/Sync for EvalState` the C API doesn't make these promises, so neither should
+  `nix-bindings-rust`. Thread safety is improving upstream, but if you want to take this risk,
+  it should be an intentional opt-in.
 
 ## [0.2.1] - 2026-05-16
 
