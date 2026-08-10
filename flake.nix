@@ -1,5 +1,5 @@
 {
-  description = "Rust bindings for the Nix C API";
+  description = "Rust bindings for Nix's C API and focused C++ extension points";
 
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";

@@ -11,6 +11,8 @@ This workspace provides multiple crates that wrap different layers of the Nix C 
 - **`nix-bindings-expr`** - Expression evaluation and type extraction
 - **`nix-bindings-flake`** - Flake operations
 - **`nix-bindings-fetchers`** - Fetcher functionality (requires Nix ≥ 2.29)
+- **`nix-bindings-logger`** - Log messages and build activities through Nix's
+  in-process logger using a small CXX bridge
 
 The `*-sys` crates contain generated FFI bindings and are not intended for direct use.
 
