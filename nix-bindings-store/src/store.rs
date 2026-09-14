@@ -24,6 +24,7 @@ static INIT: LazyLock<Result<()>> = LazyLock::new(|| unsafe {
     Ok(())
 });
 
+#[clippy::has_significant_drop]
 struct StoreRef {
     inner: NonNull<raw::Store>,
 }
