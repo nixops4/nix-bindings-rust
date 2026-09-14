@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `EvalStateBuilder::set_setting` for configuring evaluator settings (e.g. `pure-eval`) without relying on global config state. Requires Nix >= 2.36. ([#69] by [@adisbladis])
+
 ## [0.2.1] - 2026-05-16
 
 ### Added
@@ -86,6 +90,7 @@ Thanks to everyone who contributed to the initial development, some of whom may 
 <!-- end of 0.1.0 release section -->
 
 [@aanderse]: https://github.com/aanderse
+[@adisbladis]: https://github.com/adisbladis
 [@artemist]: https://github.com/artemist
 [@dramforever]: https://github.com/dramforever
 [@Ericson2314]: https://github.com/Ericson2314
@@ -109,6 +114,7 @@ Thanks to everyone who contributed to the initial development, some of whom may 
 [#52]: https://github.com/nixops4/nix-bindings-rust/pull/52
 [#63]: https://github.com/nixops4/nix-bindings-rust/pull/63
 [issue #64]: https://github.com/nixops4/nix-bindings-rust/issues/64
+[#69]: https://github.com/nixops4/nix-bindings-rust/pull/69
 [Unreleased]: https://github.com/nixops4/nix-bindings-rust/compare/0.2.1...HEAD
 [0.2.1]: https://github.com/nixops4/nix-bindings-rust/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/nixops4/nix-bindings-rust/compare/0.1.0...0.2.0
