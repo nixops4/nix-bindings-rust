@@ -248,6 +248,8 @@ pub struct EvalStateBuilder {
     eval_state_builder: *mut raw::eval_state_builder,
     lookup_path: Vec<CString>,
     load_ambient_settings: bool,
+    #[cfg(nix_at_least = "2.36.0pre")]
+    settings: Vec<(CString, CString)>,
     store: Store,
 }
 #[cfg(nix_at_least = "2.26")]
@@ -270,6 +272,8 @@ impl EvalStateBuilder {
             eval_state_builder,
             lookup_path: Vec::new(),
             load_ambient_settings: true,
+            #[cfg(nix_at_least = "2.36.0pre")]
+            settings: Vec::new(),
         })
     }
     /// Sets the [lookup path](https://nix.dev/manual/nix/latest/language/constructs/lookup-path.html) for Nix expression evaluation.
@@ -294,6 +298,27 @@ impl EvalStateBuilder {
         self.load_ambient_settings = load;
         self
     }
+
+    /// Sets a single evaluator setting (as documented in the Nix manual) on the builder.
+    ///
+    /// Like [`lookup_path`](Self::lookup_path), this is applied in [`build`](Self::build),
+    /// after ambient settings are loaded (see [`load_ambient_settings`](Self::load_ambient_settings)).
+    /// An explicitly set setting therefore always wins over a value from `nix.conf` or
+    /// `NIX_CONFIG`, regardless of call order. An unknown setting name is reported as
+    /// an error from `build`, not from this method.
+    ///
+    /// Requires Nix >= 2.36.0pre (`nix_eval_state_builder_set_setting`).
+    #[cfg(nix_at_least = "2.36.0pre")]
+    pub fn set_setting(mut self, key: &str, value: &str) -> Result<Self> {
+        let key_c = CString::new(key).with_context(|| {
+            format!("EvalStateBuilder::set_setting: key `{key}` contains null byte")
+        })?;
+        let value_c = CString::new(value).with_context(|| {
+            format!("EvalStateBuilder::set_setting: value `{value}` contains null byte")
+        })?;
+        self.settings.push((key_c, value_c));
+        Ok(self)
+    }
     /// Builds the configured [`EvalState`].
     pub fn build(&self) -> Result<EvalState> {
         // Make sure the library is initialized
@@ -308,6 +333,19 @@ impl EvalStateBuilder {
                 check_call!(raw::eval_state_builder_load(
                     &mut context,
                     self.eval_state_builder
+                ))?;
+            }
+        }
+
+        // After ambient settings load, so that `EvalStateBuilder::set_setting` takes priority.
+        #[cfg(nix_at_least = "2.36.0pre")]
+        for (key, value) in &self.settings {
+            unsafe {
+                check_call!(raw::eval_state_builder_set_setting(
+                    &mut context,
+                    self.eval_state_builder,
+                    key.as_ptr(),
+                    value.as_ptr()
                 ))?;
             }
         }
@@ -1393,6 +1431,46 @@ mod tests {
     }
 
     #[test]
+    #[cfg(nix_at_least = "2.36.0pre" /* eval_state_builder_set_setting */)]
+    fn eval_state_builder_set_setting() {
+        // Test whether setting eval settings via the C-api actually apply.
+        gc_registering_current_thread(|| {
+            // Presence of builtins.currentSystem is used as an indicater whether pure-eval is used or not.
+            fn has_current_system(es: &mut EvalState) -> bool {
+                let v = es
+                    .eval_from_string("builtins ? currentSystem", "<test>")
+                    .unwrap();
+                es.force(&v).unwrap();
+                es.require_bool(&v).unwrap()
+            }
+
+            // A builder with no settings evaluates impurely.
+            let mut impure = EvalStateBuilder::new(Store::open(None, HashMap::new()).unwrap())
+                .unwrap()
+                .build()
+                .unwrap();
+            assert!(has_current_system(&mut impure));
+
+            // A builder with pure-eval applied has no builtins.currentSystem
+            let builder = EvalStateBuilder::new(Store::open(None, HashMap::new()).unwrap())
+                .unwrap()
+                .set_setting("pure-eval", "true")
+                .unwrap();
+            let mut pure = builder.build().unwrap();
+            assert!(!has_current_system(&mut pure));
+
+            // An unknown setting errors out on build.
+            let unknown = EvalStateBuilder::new(Store::open(None, HashMap::new()).unwrap())
+                .unwrap()
+                .set_setting("not-a-nix-setting", "x")
+                .unwrap()
+                .build();
+            assert!(unknown.is_err());
+        })
+        .unwrap();
+    }
+
+    #[test]
     fn eval_state_value_int() {
         gc_registering_current_thread(|| {
             let store = Store::open(None, HashMap::new()).unwrap();
@@ -1929,7 +2007,7 @@ mod tests {
                             }}
                     a path: ${builtins.toFile "just-a-file" "ooh file good"}
                     a derivation path by itself: ${
-                        builtins.unsafeDiscardOutputDependency 
+                        builtins.unsafeDiscardOutputDependency
                             (derivation {
                                 name = "not-actually-built-yet";
                                 system = builtins.currentSystem;
