@@ -66,16 +66,11 @@ pub fn get(key: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::check_call;
-
     use super::*;
 
     #[ctor::ctor]
     fn setup() {
-        let mut ctx = context::Context::new();
-        unsafe {
-            check_call!(nix_bindings_util_sys::libutil_init(&mut ctx)).unwrap();
-        }
+        crate::init().unwrap();
     }
 
     #[test]
