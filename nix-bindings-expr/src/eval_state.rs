@@ -248,6 +248,8 @@ pub struct EvalStateBuilder {
     eval_state_builder: *mut raw::eval_state_builder,
     lookup_path: Vec<CString>,
     load_ambient_settings: bool,
+    #[cfg(nix_at_least = "2.36.0pre")]
+    settings: Vec<(CString, CString)>,
     store: Store,
 }
 #[cfg(nix_at_least = "2.26")]
@@ -270,6 +272,8 @@ impl EvalStateBuilder {
             eval_state_builder,
             lookup_path: Vec::new(),
             load_ambient_settings: true,
+            #[cfg(nix_at_least = "2.36.0pre")]
+            settings: Vec::new(),
         })
     }
     /// Sets the [lookup path](https://nix.dev/manual/nix/latest/language/constructs/lookup-path.html) for Nix expression evaluation.
@@ -297,24 +301,22 @@ impl EvalStateBuilder {
 
     /// Sets a single evaluator setting (as documented in the Nix manual) on the builder.
     ///
+    /// Like [`lookup_path`](Self::lookup_path), this is applied in [`build`](Self::build),
+    /// after ambient settings are loaded (see [`load_ambient_settings`](Self::load_ambient_settings)).
+    /// An explicitly set setting therefore always wins over a value from `nix.conf` or
+    /// `NIX_CONFIG`, regardless of call order. An unknown setting name is reported as
+    /// an error from `build`, not from this method.
+    ///
     /// Requires Nix >= 2.36.0pre (`nix_eval_state_builder_set_setting`).
     #[cfg(nix_at_least = "2.36.0pre")]
-    pub fn set_setting(self, key: &str, value: &str) -> Result<Self> {
+    pub fn set_setting(mut self, key: &str, value: &str) -> Result<Self> {
         let key_c = CString::new(key).with_context(|| {
             format!("EvalStateBuilder::set_setting: key `{key}` contains null byte")
         })?;
         let value_c = CString::new(value).with_context(|| {
             format!("EvalStateBuilder::set_setting: value `{value}` contains null byte")
         })?;
-        let mut context = Context::new();
-        unsafe {
-            check_call!(raw::eval_state_builder_set_setting(
-                &mut context,
-                self.eval_state_builder,
-                key_c.as_ptr(),
-                value_c.as_ptr()
-            ))?;
-        }
+        self.settings.push((key_c, value_c));
         Ok(self)
     }
     /// Builds the configured [`EvalState`].
@@ -331,6 +333,19 @@ impl EvalStateBuilder {
                 check_call!(raw::eval_state_builder_load(
                     &mut context,
                     self.eval_state_builder
+                ))?;
+            }
+        }
+
+        // After ambient settings load, so that `EvalStateBuilder::set_setting` takes priority.
+        #[cfg(nix_at_least = "2.36.0pre")]
+        for (key, value) in &self.settings {
+            unsafe {
+                check_call!(raw::eval_state_builder_set_setting(
+                    &mut context,
+                    self.eval_state_builder,
+                    key.as_ptr(),
+                    value.as_ptr()
                 ))?;
             }
         }
@@ -1444,10 +1459,12 @@ mod tests {
             let mut pure = builder.build().unwrap();
             assert!(!has_current_system(&mut pure));
 
-            // An unknown setting errors out.
+            // An unknown setting errors out on build.
             let unknown = EvalStateBuilder::new(Store::open(None, HashMap::new()).unwrap())
                 .unwrap()
-                .set_setting("not-a-nix-setting", "x");
+                .set_setting("not-a-nix-setting", "x")
+                .unwrap()
+                .build();
             assert!(unknown.is_err());
         })
         .unwrap();
