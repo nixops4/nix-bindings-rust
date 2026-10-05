@@ -180,17 +180,19 @@
             ;
           NIX_DEBUG_INFO_DIRS =
             let
-              # TODO: add to Nixpkgs lib
-              getDebug =
-                pkg:
-                if pkg ? debug then
-                  pkg.debug
-                else if pkg ? lib then
-                  pkg.lib
+              getDebug = pkgs.lib.getFirstOutput [
+                "debug"
+                "lib"
+              ];
+              # The aggregate Nix package has no debug output; the debug info
+              # lives in the per-component library packages.
+              debugPackages =
+                if config.packages.nix ? libs then
+                  pkgs.lib.attrValues config.packages.nix.libs
                 else
-                  pkg;
+                  [ config.packages.nix ];
             in
-            "${getDebug config.packages.nix}/lib/debug";
+            pkgs.lib.makeSearchPath "lib/debug" (map getDebug debugPackages);
           buildInputs = [
             config.packages.nix
           ];
