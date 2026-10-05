@@ -27,6 +27,8 @@ Based on the [HCI Effects cargo publish workflow].
 
 8. Merge the release PR
 
+9. Manually update gh-pages to include the tag in the list
+
 ---
 
 Dissatisfied with the coarse grained release process? Complain to @roberth and he'll get it done for you.

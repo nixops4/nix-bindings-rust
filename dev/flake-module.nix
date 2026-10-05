@@ -235,19 +235,23 @@
         "aarch64-linux"
       ];
       onPush.default.outputs = {
-        effects.pushDocs = lib.optionalAttrs (hci.config.repo.branch == "main") (
-          withSystem "x86_64-linux" (
-            { config, hci-effects, ... }:
-            hci-effects.gitWriteBranch {
-              git.checkout.remote.url = hci.config.repo.remoteHttpUrl;
-              git.checkout.forgeType = "github";
-              git.checkout.user = "x-access-token";
-              git.update.branch = "gh-pages";
-              contents = config.packages.docs;
-              destination = "development"; # directory
-            }
-          )
-        );
+        effects.pushDocs =
+          lib.optionalAttrs (hci.config.repo.branch == "main" || hci.config.repo.tag != null)
+            (
+              withSystem "x86_64-linux" (
+                { config, hci-effects, ... }:
+                hci-effects.gitWriteBranch {
+                  git.checkout.remote.url = hci.config.repo.remoteHttpUrl;
+                  git.checkout.forgeType = "github";
+                  git.checkout.user = "x-access-token";
+                  git.update.branch = "gh-pages";
+                  contents = config.packages.docs;
+                  destination =
+                    # directory name
+                    if hci.config.repo.tag != null then hci.config.repo.tag else "development";
+                }
+              )
+            );
       };
     };
   hercules-ci.flake-update = {
