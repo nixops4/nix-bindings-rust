@@ -17,7 +17,7 @@
       ...
     }:
     {
-      nix-bindings-rust.nixPackage = inputs'.nix.packages.default;
+      nix-bindings-rust.nixPackage = if inputs' ? nix then inputs'.nix.packages.nix else pkgs.nix;
 
       treefmt = {
         # Used to find the project root

@@ -3,11 +3,13 @@
 
   inputs = {
     flake-parts.url = "github:hercules-ci/flake-parts";
-    nix.url = "github:NixOS/nix";
-    nix.inputs.nixpkgs.follows = "nixpkgs";
     nix-cargo-integration.url = "github:90-008/nix-cargo-integration";
     nix-cargo-integration.inputs.nixpkgs.follows = "nixpkgs";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    # optional input
+    # nix.url = "github:NixOS/nix";
+    # nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs =
@@ -179,10 +181,11 @@
         perSystem =
           {
             inputs',
+            pkgs,
             ...
           }:
           {
-            packages.nix = inputs'.nix.packages.nix;
+            packages.nix = if inputs' ? nix then inputs'.nix.packages.nix else pkgs.nix;
           };
 
         partitionedAttrs.devShells = "dev";
@@ -190,8 +193,8 @@
         partitionedAttrs.herculesCI = "dev";
         # Packages are basically just checks in this project; a library by
         # itself is not useful. That's just not how the Rust integration works.
-        # By taking `packages` from `dev` we benefit from this dev-only definition:
-        #      nix-bindings-rust.nixPackage = inputs'.nix.packages.default;
+        # They are taken from the `dev` partition so that they follow its
+        # configuration, such as which Nix package to build against.
         partitionedAttrs.packages = "dev";
 
         partitions.dev.extraInputsFlake = ./dev;
