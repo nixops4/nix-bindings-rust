@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["get_version","init"],"macro":[["check_call",1],["check_call_opt_key",1],["result_string_init",1]],"mod":["context","nix_version","settings","string_return"]};
+window.SIDEBAR_ITEMS = {"macro":["check_call","check_call_opt_key","result_string_init"],"mod":["context","nix_version","settings","string_return"]};
