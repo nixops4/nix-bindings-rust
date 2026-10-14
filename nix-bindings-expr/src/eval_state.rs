@@ -572,6 +572,25 @@ impl EvalState {
         unsafe { check_call!(raw::get_bool(&mut self.context, v.raw_ptr())) }
     }
 
+    /// Extracts the value from a [float][`ValueType::Float`] Nix value.
+    ///
+    /// Floats should not be in the Nix language. Avoid them if you can.
+    ///
+    /// Forces [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) and verifies the value is a float.
+    /// An [integer][`ValueType::Int`] is not converted; it is an error like any other type.
+    ///
+    /// Returns the float value if successful, or an [`Err`] if evaluation failed or the value is not a float.
+    #[doc(alias = "double")]
+    #[doc(alias = "nix_get_float")]
+    #[doc(alias = "get_float")]
+    pub fn require_float(&mut self, v: &Value) -> Result<f64> {
+        let t = self.value_type(v)?;
+        if t != ValueType::Float {
+            bail!("expected a float, but got a {:?}", t);
+        }
+        unsafe { check_call!(raw::get_float(&mut self.context, v.raw_ptr())) }
+    }
+
     /// Extracts all elements from a [list][`ValueType::List`] Nix value.
     ///
     /// Forces [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) and verifies the value is a list.
@@ -858,6 +877,23 @@ impl EvalState {
         let v = unsafe {
             let value = self.new_value_uninitialized()?;
             check_call!(raw::init_null(&mut self.context, value.raw_ptr()))?;
+            value
+        };
+        Ok(v)
+    }
+
+    /// Creates a new [float][`ValueType::Float`] Nix value.
+    ///
+    /// Floats should not be in the Nix language.
+    /// Avoid them if possible.
+    #[doc(alias = "make_float")]
+    #[doc(alias = "create_float")]
+    #[doc(alias = "float_value")]
+    #[doc(alias = "double_value")]
+    pub fn new_value_float(&mut self, f: f64) -> Result<Value> {
+        let v = unsafe {
+            let value = self.new_value_uninitialized()?;
+            check_call!(raw::init_float(&mut self.context, value.raw_ptr(), f))?;
             value
         };
         Ok(v)
@@ -1894,6 +1930,63 @@ mod tests {
             let mut es = EvalState::new(store, []).unwrap();
             let v = es.eval_from_string("null", "<test>").unwrap();
             assert_eq!(es.value_type(&v).unwrap(), ValueType::Null);
+        })
+        .unwrap();
+    }
+
+    /// Float values are compared within a tolerance: the representation is Nix's concern.
+    const FLOAT_TOLERANCE: f64 = 1e-9;
+
+    #[test]
+    fn eval_state_new_float() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.new_value_float(1.5).unwrap();
+            assert_eq!(es.value_type(&v).unwrap(), ValueType::Float);
+            let f = es.require_float(&v).unwrap();
+            assert!((f - 1.5).abs() < FLOAT_TOLERANCE, "got {f}");
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_value_float() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.eval_from_string("1.5", "<test>").unwrap();
+            assert_eq!(es.value_type(&v).unwrap(), ValueType::Float);
+            let f = es.require_float(&v).unwrap();
+            assert!((f - 1.5).abs() < FLOAT_TOLERANCE, "got {f}");
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_require_float_type_errors() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            fn err(es: &mut EvalState, v: &Value) -> String {
+                format!("{:#}", es.require_float(v).unwrap_err())
+            }
+
+            let v = es.eval_from_string("1", "<test>").unwrap();
+            assert_eq!(err(&mut es, &v), "expected a float, but got a Int");
+
+            let v = es.eval_from_string("\"1.5\"", "<test>").unwrap();
+            assert_eq!(err(&mut es, &v), "expected a float, but got a String");
+
+            // An application, so that require_float is what forces the abort
+            let f = es
+                .eval_from_string("_: abort \"test float's abort message\"", "<test>")
+                .unwrap();
+            let a = es.new_value_null().unwrap();
+            let v = es.new_value_apply(&f, &a).unwrap();
+            // Nix renders this message; only check that it is passed through
+            let e = err(&mut es, &v);
+            assert!(e.contains("test float's abort message"), "got {e}");
         })
         .unwrap();
     }

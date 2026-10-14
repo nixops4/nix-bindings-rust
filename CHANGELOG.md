@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PrimOp::register` — register a primop as a global builtin via `nix_register_primop`, making it callable from every `EvalState` created afterwards. Statically-registered builtins were not previously expressible through the crate.
 - `EvalState::new_value_bool`.
 - `EvalState::new_value_null`.
+- `EvalState::require_float` and `EvalState::new_value_float`. They exist only for completeness; avoid Nix floats if possible.
 
 ### Changed
 
