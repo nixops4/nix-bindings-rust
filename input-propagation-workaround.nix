@@ -26,6 +26,7 @@
         else
           # Fallback for older Nix versions without split libs
           {
+            nix-util = nixPackage;
             nix-util-c = nixPackage;
             nix-store-c = nixPackage;
             nix-expr-c = nixPackage;
@@ -109,6 +110,7 @@
         nix-bindings-rust.inputPropagationWorkaround.crateInputMapping = {
           # -sys crates with their transitive dependencies
           "nix-bindings-bdwgc-sys" = [ pkgs.boehmgc ];
+          "nix-bindings-logger" = [ nixLibs.nix-util.dev ];
           "nix-bindings-util-sys" = [ nixLibs.nix-util-c.dev ];
           "nix-bindings-store-sys" = [
             nixLibs.nix-store-c.dev
