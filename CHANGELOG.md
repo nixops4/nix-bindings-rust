@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EvalStateBuilder::set_setting` for configuring evaluator settings (e.g. `pure-eval`) without relying on global config state. Requires Nix >= 2.36. ([#69] by [@adisbladis])
 - `PrimOp::to_value` — attach a primop to a fresh function `Value` in a given `EvalState`. Replaces `EvalState::new_value_primop`.
 - `PrimOp::register` — register a primop as a global builtin via `nix_register_primop`, making it callable from every `EvalState` created afterwards. Statically-registered builtins were not previously expressible through the crate.
+- `EvalState::new_value_bool`.
 
 ### Changed
 

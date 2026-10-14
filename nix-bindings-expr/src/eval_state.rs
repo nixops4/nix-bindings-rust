@@ -836,6 +836,20 @@ impl EvalState {
         Ok(v)
     }
 
+    /// Creates a new [boolean][`ValueType::Bool`] Nix value.
+    #[doc(alias = "make_bool")]
+    #[doc(alias = "create_bool")]
+    #[doc(alias = "bool_value")]
+    #[doc(alias = "boolean_value")]
+    pub fn new_value_bool(&mut self, b: bool) -> Result<Value> {
+        let v = unsafe {
+            let value = self.new_value_uninitialized()?;
+            check_call!(raw::init_bool(&mut self.context, value.raw_ptr(), b))?;
+            value
+        };
+        Ok(v)
+    }
+
     /// Creates a new [thunk](https://nix.dev/manual/nix/latest/language/evaluation.html#laziness) Nix value.
     ///
     /// The [thunk](https://nix.dev/manual/nix/latest/language/evaluation.html#laziness) will lazily evaluate to the result of the given Rust function when forced.
@@ -1817,6 +1831,34 @@ mod tests {
             assert!(t == Some(ValueType::Int));
             let i = es.require_int(&v).unwrap();
             assert!(i == 42);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_bool() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            for b in [true, false] {
+                let v = es.new_value_bool(b).unwrap();
+                assert_eq!(es.value_type(&v).unwrap(), ValueType::Bool);
+                assert_eq!(es.require_bool(&v).unwrap(), b);
+            }
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_require_bool_on_null() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.eval_from_string("null", "<test>").unwrap();
+            assert_eq!(
+                format!("{:#}", es.require_bool(&v).unwrap_err()),
+                "expected a bool, but got a Null"
+            );
         })
         .unwrap();
     }
