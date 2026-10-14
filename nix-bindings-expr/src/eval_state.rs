@@ -850,6 +850,19 @@ impl EvalState {
         Ok(v)
     }
 
+    /// Creates a new [`null`][`ValueType::Null`] Nix value.
+    #[doc(alias = "make_null")]
+    #[doc(alias = "create_null")]
+    #[doc(alias = "null_value")]
+    pub fn new_value_null(&mut self) -> Result<Value> {
+        let v = unsafe {
+            let value = self.new_value_uninitialized()?;
+            check_call!(raw::init_null(&mut self.context, value.raw_ptr()))?;
+            value
+        };
+        Ok(v)
+    }
+
     /// Creates a new [thunk](https://nix.dev/manual/nix/latest/language/evaluation.html#laziness) Nix value.
     ///
     /// The [thunk](https://nix.dev/manual/nix/latest/language/evaluation.html#laziness) will lazily evaluate to the result of the given Rust function when forced.
@@ -1859,6 +1872,28 @@ mod tests {
                 format!("{:#}", es.require_bool(&v).unwrap_err()),
                 "expected a bool, but got a Null"
             );
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_null() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.new_value_null().unwrap();
+            assert_eq!(es.value_type(&v).unwrap(), ValueType::Null);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_value_null() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.eval_from_string("null", "<test>").unwrap();
+            assert_eq!(es.value_type(&v).unwrap(), ValueType::Null);
         })
         .unwrap();
     }
