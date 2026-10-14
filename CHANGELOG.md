@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EvalState::new_value_bool`.
 - `EvalState::new_value_null`.
 - `EvalState::require_float` and `EvalState::new_value_float`. They exist only for completeness; avoid Nix floats if possible.
+- `EvalState::require_system_path`, for path values relative to the file system root of the evaluating process, currently the only kind that Nix exposes.
 
 ### Changed
 

@@ -143,9 +143,11 @@ use nix_bindings_util::string_return::{
     callback_get_result_string, callback_get_result_string_data,
 };
 use nix_bindings_util::{check_call, check_call_opt_key, result_string_init};
-use std::ffi::{c_char, CString};
+use std::ffi::{c_char, CStr, CString, OsStr};
 use std::iter::FromIterator;
 use std::os::raw::c_uint;
+use std::os::unix::ffi::OsStrExt as _;
+use std::path::PathBuf;
 use std::ptr::{null, null_mut, NonNull};
 use std::sync::LazyLock;
 
@@ -589,6 +591,30 @@ impl EvalState {
             bail!("expected a float, but got a {:?}", t);
         }
         unsafe { check_call!(raw::get_float(&mut self.context, v.raw_ptr())) }
+    }
+
+    /// Extracts the file system path from a [path][`ValueType::Path`] Nix value.
+    ///
+    /// Forces [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) and verifies the value is a path.
+    ///
+    /// A system path is absolute, relative to the presumed file system root of the evaluating process.
+    /// This is the only kind of path value that Nix currently exposes.
+    /// If Nix exposes path values with other roots, expect an error for those.
+    ///
+    /// Returns the path if successful, or an [`Err`] if evaluation failed or the value is not a path.
+    #[doc(alias = "path")]
+    #[doc(alias = "nix_get_path_string")]
+    #[doc(alias = "get_path_string")]
+    #[doc(alias = "require_path")]
+    pub fn require_system_path(&mut self, v: &Value) -> Result<PathBuf> {
+        let t = self.value_type(v)?;
+        if t != ValueType::Path {
+            bail!("expected a path, but got a {:?}", t);
+        }
+        // The string is valid while the value is; copy it out right away.
+        let s = unsafe { check_call!(raw::get_path_string(&mut self.context, v.raw_ptr())) }?;
+        let bytes = unsafe { CStr::from_ptr(s) }.to_bytes();
+        Ok(PathBuf::from(OsStr::from_bytes(bytes)))
     }
 
     /// Extracts all elements from a [list][`ValueType::List`] Nix value.
@@ -1987,6 +2013,54 @@ mod tests {
             // Nix renders this message; only check that it is passed through
             let e = err(&mut es, &v);
             assert!(e.contains("test float's abort message"), "got {e}");
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_require_system_path() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es
+                .eval_from_string("/foo/bar + \"/baz\"", "<test>")
+                .unwrap();
+            assert_eq!(es.value_type(&v).unwrap(), ValueType::Path);
+            assert_eq!(
+                es.require_system_path(&v).unwrap(),
+                std::path::PathBuf::from("/foo/bar/baz")
+            );
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_require_system_path_not_utf8() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            // The first byte of the two-byte UTF-8 encoding of "ÿ"
+            let v = es
+                .eval_from_string("/foo + (\"/\" + builtins.substring 0 1 \"ÿ\")", "<test>")
+                .unwrap();
+            assert_eq!(
+                es.require_system_path(&v).unwrap(),
+                std::path::PathBuf::from(OsStr::from_bytes(b"/foo/\xc3"))
+            );
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_require_system_path_on_string() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.eval_from_string("\"/foo/bar\"", "<test>").unwrap();
+            assert_eq!(
+                format!("{:#}", es.require_system_path(&v).unwrap_err()),
+                "expected a path, but got a String"
+            );
         })
         .unwrap();
     }
