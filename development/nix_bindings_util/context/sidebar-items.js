@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"macro":["check_call","check_call_opt_key"],"struct":["Context"]};
+window.SIDEBAR_ITEMS = {"macro":[["check_call",1],["check_call_opt_key",1]],"struct":["Context"]};
