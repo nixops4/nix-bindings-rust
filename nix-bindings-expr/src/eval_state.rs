@@ -143,9 +143,11 @@ use nix_bindings_util::string_return::{
     callback_get_result_string, callback_get_result_string_data,
 };
 use nix_bindings_util::{check_call, check_call_opt_key, result_string_init};
-use std::ffi::{c_char, CString};
+use std::ffi::{c_char, CStr, CString, OsStr};
 use std::iter::FromIterator;
 use std::os::raw::c_uint;
+use std::os::unix::ffi::OsStrExt as _;
+use std::path::PathBuf;
 use std::ptr::{null, null_mut, NonNull};
 use std::sync::LazyLock;
 
@@ -572,6 +574,49 @@ impl EvalState {
         unsafe { check_call!(raw::get_bool(&mut self.context, v.raw_ptr())) }
     }
 
+    /// Extracts the value from a [float][`ValueType::Float`] Nix value.
+    ///
+    /// Floats should not be in the Nix language. Avoid them if you can.
+    ///
+    /// Forces [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) and verifies the value is a float.
+    /// An [integer][`ValueType::Int`] is not converted; it is an error like any other type.
+    ///
+    /// Returns the float value if successful, or an [`Err`] if evaluation failed or the value is not a float.
+    #[doc(alias = "double")]
+    #[doc(alias = "nix_get_float")]
+    #[doc(alias = "get_float")]
+    pub fn require_float(&mut self, v: &Value) -> Result<f64> {
+        let t = self.value_type(v)?;
+        if t != ValueType::Float {
+            bail!("expected a float, but got a {:?}", t);
+        }
+        unsafe { check_call!(raw::get_float(&mut self.context, v.raw_ptr())) }
+    }
+
+    /// Extracts the file system path from a [path][`ValueType::Path`] Nix value.
+    ///
+    /// Forces [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) and verifies the value is a path.
+    ///
+    /// A system path is absolute, relative to the presumed file system root of the evaluating process.
+    /// This is the only kind of path value that Nix currently exposes.
+    /// If Nix exposes path values with other roots, expect an error for those.
+    ///
+    /// Returns the path if successful, or an [`Err`] if evaluation failed or the value is not a path.
+    #[doc(alias = "path")]
+    #[doc(alias = "nix_get_path_string")]
+    #[doc(alias = "get_path_string")]
+    #[doc(alias = "require_path")]
+    pub fn require_system_path(&mut self, v: &Value) -> Result<PathBuf> {
+        let t = self.value_type(v)?;
+        if t != ValueType::Path {
+            bail!("expected a path, but got a {:?}", t);
+        }
+        // The string is valid while the value is; copy it out right away.
+        let s = unsafe { check_call!(raw::get_path_string(&mut self.context, v.raw_ptr())) }?;
+        let bytes = unsafe { CStr::from_ptr(s) }.to_bytes();
+        Ok(PathBuf::from(OsStr::from_bytes(bytes)))
+    }
+
     /// Extracts all elements from a [list][`ValueType::List`] Nix value.
     ///
     /// Forces [evaluation](https://nix.dev/manual/nix/latest/language/evaluation.html) and verifies the value is a list.
@@ -831,6 +876,50 @@ impl EvalState {
         let v = unsafe {
             let value = self.new_value_uninitialized()?;
             check_call!(raw::init_int(&mut self.context, value.raw_ptr(), i))?;
+            value
+        };
+        Ok(v)
+    }
+
+    /// Creates a new [boolean][`ValueType::Bool`] Nix value.
+    #[doc(alias = "make_bool")]
+    #[doc(alias = "create_bool")]
+    #[doc(alias = "bool_value")]
+    #[doc(alias = "boolean_value")]
+    pub fn new_value_bool(&mut self, b: bool) -> Result<Value> {
+        let v = unsafe {
+            let value = self.new_value_uninitialized()?;
+            check_call!(raw::init_bool(&mut self.context, value.raw_ptr(), b))?;
+            value
+        };
+        Ok(v)
+    }
+
+    /// Creates a new [`null`][`ValueType::Null`] Nix value.
+    #[doc(alias = "make_null")]
+    #[doc(alias = "create_null")]
+    #[doc(alias = "null_value")]
+    pub fn new_value_null(&mut self) -> Result<Value> {
+        let v = unsafe {
+            let value = self.new_value_uninitialized()?;
+            check_call!(raw::init_null(&mut self.context, value.raw_ptr()))?;
+            value
+        };
+        Ok(v)
+    }
+
+    /// Creates a new [float][`ValueType::Float`] Nix value.
+    ///
+    /// Floats should not be in the Nix language.
+    /// Avoid them if possible.
+    #[doc(alias = "make_float")]
+    #[doc(alias = "create_float")]
+    #[doc(alias = "float_value")]
+    #[doc(alias = "double_value")]
+    pub fn new_value_float(&mut self, f: f64) -> Result<Value> {
+        let v = unsafe {
+            let value = self.new_value_uninitialized()?;
+            check_call!(raw::init_float(&mut self.context, value.raw_ptr(), f))?;
             value
         };
         Ok(v)
@@ -1817,6 +1906,161 @@ mod tests {
             assert!(t == Some(ValueType::Int));
             let i = es.require_int(&v).unwrap();
             assert!(i == 42);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_bool() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            for b in [true, false] {
+                let v = es.new_value_bool(b).unwrap();
+                assert_eq!(es.value_type(&v).unwrap(), ValueType::Bool);
+                assert_eq!(es.require_bool(&v).unwrap(), b);
+            }
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_require_bool_on_null() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.eval_from_string("null", "<test>").unwrap();
+            assert_eq!(
+                format!("{:#}", es.require_bool(&v).unwrap_err()),
+                "expected a bool, but got a Null"
+            );
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_null() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.new_value_null().unwrap();
+            assert_eq!(es.value_type(&v).unwrap(), ValueType::Null);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_value_null() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.eval_from_string("null", "<test>").unwrap();
+            assert_eq!(es.value_type(&v).unwrap(), ValueType::Null);
+        })
+        .unwrap();
+    }
+
+    /// Float values are compared within a tolerance: the representation is Nix's concern.
+    const FLOAT_TOLERANCE: f64 = 1e-9;
+
+    #[test]
+    fn eval_state_new_float() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.new_value_float(1.5).unwrap();
+            assert_eq!(es.value_type(&v).unwrap(), ValueType::Float);
+            let f = es.require_float(&v).unwrap();
+            assert!((f - 1.5).abs() < FLOAT_TOLERANCE, "got {f}");
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_value_float() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.eval_from_string("1.5", "<test>").unwrap();
+            assert_eq!(es.value_type(&v).unwrap(), ValueType::Float);
+            let f = es.require_float(&v).unwrap();
+            assert!((f - 1.5).abs() < FLOAT_TOLERANCE, "got {f}");
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_require_float_type_errors() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            fn err(es: &mut EvalState, v: &Value) -> String {
+                format!("{:#}", es.require_float(v).unwrap_err())
+            }
+
+            let v = es.eval_from_string("1", "<test>").unwrap();
+            assert_eq!(err(&mut es, &v), "expected a float, but got a Int");
+
+            let v = es.eval_from_string("\"1.5\"", "<test>").unwrap();
+            assert_eq!(err(&mut es, &v), "expected a float, but got a String");
+
+            // An application, so that require_float is what forces the abort
+            let f = es
+                .eval_from_string("_: abort \"test float's abort message\"", "<test>")
+                .unwrap();
+            let a = es.new_value_null().unwrap();
+            let v = es.new_value_apply(&f, &a).unwrap();
+            // Nix renders this message; only check that it is passed through
+            let e = err(&mut es, &v);
+            assert!(e.contains("test float's abort message"), "got {e}");
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_require_system_path() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es
+                .eval_from_string("/foo/bar + \"/baz\"", "<test>")
+                .unwrap();
+            assert_eq!(es.value_type(&v).unwrap(), ValueType::Path);
+            assert_eq!(
+                es.require_system_path(&v).unwrap(),
+                std::path::PathBuf::from("/foo/bar/baz")
+            );
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_require_system_path_not_utf8() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            // The first byte of the two-byte UTF-8 encoding of "ÿ"
+            let v = es
+                .eval_from_string("/foo + (\"/\" + builtins.substring 0 1 \"ÿ\")", "<test>")
+                .unwrap();
+            assert_eq!(
+                es.require_system_path(&v).unwrap(),
+                std::path::PathBuf::from(OsStr::from_bytes(b"/foo/\xc3"))
+            );
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_require_system_path_on_string() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, HashMap::new()).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let v = es.eval_from_string("\"/foo/bar\"", "<test>").unwrap();
+            assert_eq!(
+                format!("{:#}", es.require_system_path(&v).unwrap_err()),
+                "expected a path, but got a String"
+            );
         })
         .unwrap();
     }
