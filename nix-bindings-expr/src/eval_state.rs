@@ -1167,6 +1167,11 @@ impl EvalState {
     /// Accepts any iterator that yields `(String, Value)` pairs and has an exact size.
     /// Common usage includes [`Vec`], [`std::collections::HashMap`], and array literals.
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the iterator yields a different number of items than
+    /// its [`ExactSizeIterator::len`] reported.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -1207,10 +1212,14 @@ impl EvalState {
         I: IntoIterator<Item = (String, Value)>,
         I::IntoIter: ExactSizeIterator,
     {
-        let iter = attrs.into_iter();
-        let size = iter.len();
-        let bindings_builder = BindingsBuilder::new(self, size)?;
-        for (name, value) in iter {
+        let mut iter = attrs.into_iter();
+        let capacity = iter.len();
+        let bindings_builder = BindingsBuilder::new(self, capacity)?;
+        // `ExactSizeIterator::len` is not a safety guarantee, and
+        // `nix_bindings_builder_insert` may not check.
+        let mut count = 0;
+        for (name, value) in iter.by_ref().take(capacity) {
+            count += 1;
             let name =
                 CString::new(name).with_context(|| "new_value_attrs: name contains null byte")?;
             unsafe {
@@ -1221,6 +1230,19 @@ impl EvalState {
                     value.raw_ptr()
                 ))?;
             }
+        }
+        if count < capacity {
+            bail!(
+                "new_value_attrs: iterator yielded only {} of the {} items its len() promised",
+                count,
+                capacity
+            );
+        }
+        if iter.next().is_some() {
+            bail!(
+                "new_value_attrs: iterator yielded more items than its len() of {}",
+                capacity
+            );
         }
         let value = self.new_value_uninitialized()?;
         unsafe {
@@ -2751,6 +2773,64 @@ mod tests {
             assert_eq!(i, 1);
             let i = es.require_int(&b).unwrap();
             assert_eq!(i, 2);
+        })
+        .unwrap();
+    }
+
+    /// An iterator whose `len()` is the `len` field, independent of the number of items it yields.
+    struct LyingLen<I> {
+        inner: I,
+        len: usize,
+    }
+    impl<I: Iterator> Iterator for LyingLen<I> {
+        type Item = I::Item;
+        fn next(&mut self) -> Option<Self::Item> {
+            self.inner.next()
+        }
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            (self.len, Some(self.len))
+        }
+    }
+    impl<I: Iterator> ExactSizeIterator for LyingLen<I> {}
+
+    #[test]
+    fn eval_state_new_value_attrs_len_too_small() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let items = vec![
+                ("a".to_string(), es.new_value_int(1).unwrap()),
+                ("b".to_string(), es.new_value_int(2).unwrap()),
+                ("c".to_string(), es.new_value_int(3).unwrap()),
+            ];
+            let iter = LyingLen {
+                inner: items.into_iter(),
+                len: 2,
+            };
+            let err = es.new_value_attrs(iter).err().unwrap();
+            assert_eq!(
+                err.to_string(),
+                "new_value_attrs: iterator yielded more items than its len() of 2"
+            );
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_value_attrs_len_too_large() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let items = vec![("a".to_string(), es.new_value_int(1).unwrap())];
+            let iter = LyingLen {
+                inner: items.into_iter(),
+                len: 2,
+            };
+            let err = es.new_value_attrs(iter).err().unwrap();
+            assert_eq!(
+                err.to_string(),
+                "new_value_attrs: iterator yielded only 1 of the 2 items its len() promised"
+            );
         })
         .unwrap();
     }
