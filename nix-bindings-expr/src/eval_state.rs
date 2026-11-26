@@ -1162,9 +1162,9 @@ impl EvalState {
         primop.to_value(self)
     }
 
-    /// Creates a new [attribute set][`ValueType::AttrSet`] Nix value from an iterator of name-value pairs.
+    /// Creates a new [attribute set][`ValueType::AttrSet`] Nix value from name-value pairs.
     ///
-    /// Accepts any iterator that yields `(String, Value)` pairs and has an exact size.
+    /// Accepts any [`IntoIterator`] of `(String, Value)` pairs, if its iterator has an exact size.
     /// Common usage includes [`Vec`], [`std::collections::HashMap`], and array literals.
     ///
     /// # Errors
