@@ -78,6 +78,7 @@
             "nix-bindings-fetchers"
             "nix-bindings-flake-sys"
             "nix-bindings-flake"
+            "nix-bindings-logger"
           ];
           packageFlags = pkgs.lib.concatMapStringsSep " " (c: "-p ${c}") crates;
         in
@@ -142,6 +143,7 @@
                       <li><span class="crate"><a href="nix_bindings_expr/index.html">nix_bindings_expr</a></span><span class="desc">— Expression evaluation</span></li>
                       <li><span class="crate"><a href="nix_bindings_fetchers/index.html">nix_bindings_fetchers</a></span><span class="desc">— Fetcher operations</span></li>
                       <li><span class="crate"><a href="nix_bindings_flake/index.html">nix_bindings_flake</a></span><span class="desc">— Flake operations</span></li>
+                      <li><span class="crate"><a href="nix_bindings_logger/index.html">nix_bindings_logger</a></span><span class="desc">— In-process logging and build activities</span></li>
                       <li><span class="crate"><a href="nix_bindings_util/index.html">nix_bindings_util</a></span><span class="desc">— Utilities</span></li>
                     </ul>
                     <details>

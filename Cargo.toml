@@ -9,6 +9,7 @@ members = [
     "nix-bindings-expr",
     "nix-bindings-fetchers",
     "nix-bindings-flake",
+    "nix-bindings-logger",
     "nix-bindings-store",
     "nix-bindings-util",
 ]
