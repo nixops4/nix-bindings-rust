@@ -1162,9 +1162,9 @@ impl EvalState {
         primop.to_value(self)
     }
 
-    /// Creates a new [attribute set][`ValueType::AttrSet`] Nix value from an iterator of name-value pairs.
+    /// Creates a new [attribute set][`ValueType::AttrSet`] Nix value from name-value pairs.
     ///
-    /// Accepts any iterator that yields `(String, Value)` pairs and has an exact size.
+    /// Accepts any [`IntoIterator`] of `(String, Value)` pairs, if its iterator has an exact size.
     /// Common usage includes [`Vec`], [`std::collections::HashMap`], and array literals.
     ///
     /// # Errors
@@ -1253,6 +1253,120 @@ impl EvalState {
             ))?;
         }
         Ok(value)
+    }
+
+    /// Creates a new [list][`ValueType::List`] Nix value from values.
+    ///
+    /// Accepts any [`IntoIterator`] whose iterator has an exact size, such as a [`Vec`] or an array.
+    /// Does not force the elements.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the iterator yields a different number of items than its
+    /// [`ExactSizeIterator::len`] reported, if that length is larger than [`u32::MAX`],
+    /// or if Nix fails to create the list.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use nix_bindings_expr::eval_state::{EvalState, test_init, gc_register_my_thread};
+    /// # use nix_bindings_store::store::Store;
+    /// # use std::collections::HashMap;
+    /// # fn example() -> anyhow::Result<()> {
+    /// # test_init();
+    /// # let guard = gc_register_my_thread()?;
+    /// let store = Store::open(None, HashMap::new())?;
+    /// let mut es = EvalState::new(store, [])?;
+    /// let a = es.new_value_int(1)?;
+    /// let b = es.new_value_str("two")?;
+    /// let list = es.new_value_list([a, b])?;
+    /// assert_eq!(es.require_list_size(&list)?, 2);
+    /// # drop(guard);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[doc(alias = "make_list")]
+    #[doc(alias = "create_list")]
+    #[doc(alias = "array")]
+    pub fn new_value_list<I>(&mut self, items: I) -> Result<Value>
+    where
+        I: IntoIterator<Item = Value>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let mut iter = items.into_iter();
+        let size = iter.len();
+        // Every index is below the size, so this one check covers the
+        // `unsigned int` index of `nix_list_builder_insert`, before the allocation.
+        let size_u32 = u32::try_from(size).with_context(|| {
+            format!(
+                "new_value_list: len() of {} does not fit the unsigned int index of nix_list_builder_insert",
+                size
+            )
+        })?;
+        let list_builder = ListBuilder::new(self, size)?;
+        // `nix_list_builder_insert` requires an index below the size, and this
+        // `unsafe` code is responsible for that. `len()` does not settle it:
+        // any type can implement `ExactSizeIterator`, without the scrutiny
+        // that `unsafe` code gets.
+        let mut count = 0;
+        for (index, value) in (0..size_u32).zip(iter.by_ref()) {
+            unsafe {
+                check_call!(raw::list_builder_insert(
+                    &mut self.context,
+                    list_builder.ptr,
+                    index,
+                    value.raw_ptr()
+                ))?;
+            }
+            count += 1;
+        }
+        // `nix_make_list` requires every index below the size to be set.
+        if count < size {
+            bail!(
+                "new_value_list: iterator yielded only {} of the {} items its len() promised",
+                count,
+                size
+            );
+        }
+        if iter.next().is_some() {
+            bail!(
+                "new_value_list: iterator yielded more items than its len() of {}",
+                size
+            );
+        }
+        let value = self.new_value_uninitialized()?;
+        unsafe {
+            check_call!(raw::make_list(
+                &mut self.context,
+                list_builder.ptr,
+                value.raw_ptr()
+            ))?;
+        }
+        Ok(value)
+    }
+}
+
+// Internal RAII helper, like BindingsBuilder
+struct ListBuilder {
+    ptr: *mut raw::ListBuilder,
+}
+impl Drop for ListBuilder {
+    fn drop(&mut self) {
+        unsafe {
+            raw::list_builder_free(self.ptr);
+        }
+    }
+}
+impl ListBuilder {
+    fn new(eval_state: &mut EvalState, size: usize) -> Result<Self> {
+        let ptr = unsafe {
+            check_call!(raw::make_list_builder(
+                &mut eval_state.context,
+                eval_state.eval_state.as_ptr(),
+                size
+            ))
+        }?;
+        Ok(ListBuilder { ptr })
     }
 }
 
@@ -2830,6 +2944,237 @@ mod tests {
             assert_eq!(
                 err.to_string(),
                 "new_value_attrs: iterator yielded only 1 of the 2 items its len() promised"
+            );
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_value_list_empty() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let list = es.new_value_list([]).unwrap();
+            assert_eq!(es.value_type(&list).unwrap(), ValueType::List);
+            assert_eq!(es.require_list_size(&list).unwrap(), 0);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_value_list_one() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let a = es.new_value_int(42).unwrap();
+            let list = es.new_value_list([a]).unwrap();
+            assert_eq!(es.require_list_size(&list).unwrap(), 1);
+            let elem = es
+                .require_list_select_idx_strict(&list, 0)
+                .unwrap()
+                .unwrap();
+            assert_eq!(es.require_int(&elem).unwrap(), 42);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_value_list_many() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let items = (0..100)
+                .map(|i| es.new_value_int(i * 10).unwrap())
+                .collect::<Vec<_>>();
+            let list = es.new_value_list(items).unwrap();
+            assert_eq!(es.require_list_size(&list).unwrap(), 100);
+            let ints: Vec<Int> = (0..100)
+                .map(|i| {
+                    let elem = es
+                        .require_list_select_idx_strict(&list, i)
+                        .unwrap()
+                        .unwrap();
+                    es.require_int(&elem).unwrap()
+                })
+                .collect();
+            assert_eq!(ints, (0..100).map(|i| i * 10).collect::<Vec<Int>>());
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_value_list_every_type() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let exprs = [
+                "{ a = 1; }",
+                "true",
+                "1.5",
+                "x: x + 1",
+                "1",
+                "[ 2 ]",
+                "null",
+                "/some/path",
+                "\"str\"",
+            ];
+            let mut items = exprs
+                .iter()
+                .map(|e| es.eval_from_string(e, "<test>").unwrap())
+                .collect::<Vec<_>>();
+            items.push(make_thunk(&mut es, "3"));
+            let len = u32::try_from(items.len()).unwrap();
+            let list = es.new_value_list(items).unwrap();
+            let types = (0..len)
+                .map(|i| {
+                    let elem = es
+                        .require_list_select_idx_strict(&list, i)
+                        .unwrap()
+                        .unwrap();
+                    es.value_type(&elem).unwrap()
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                types,
+                vec![
+                    ValueType::AttrSet,
+                    ValueType::Bool,
+                    ValueType::Float,
+                    ValueType::Function,
+                    ValueType::Int,
+                    ValueType::List,
+                    ValueType::Null,
+                    ValueType::Path,
+                    ValueType::String,
+                    ValueType::Int,
+                ]
+            );
+            let check = es
+                .eval_from_string(
+                    r#"l:
+                    assert builtins.elemAt l 0 == { a = 1; };
+                    assert builtins.elemAt l 1 == true;
+                    assert builtins.elemAt l 2 == 1.5;
+                    # `==` is false for any two functions. Apply the function and compare the result.
+                    assert builtins.elemAt l 3 1 == 2;
+                    assert builtins.elemAt l 4 == 1;
+                    assert builtins.elemAt l 5 == [ 2 ];
+                    assert builtins.elemAt l 6 == null;
+                    assert builtins.elemAt l 7 == /some/path;
+                    assert builtins.elemAt l 8 == "str";
+                    assert builtins.elemAt l 9 == 3;
+                    null"#,
+                    "<test>",
+                )
+                .unwrap();
+            let result = es.call(check, list).unwrap();
+            assert_eq!(es.value_type(&result).unwrap(), ValueType::Null);
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_value_list_does_not_force() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let a = es.new_value_int(1).unwrap();
+            let f = es
+                .eval_from_string("_: abort \"test element's abort message\"", "<test>")
+                .unwrap();
+            let null = es.eval_from_string("null", "<test>").unwrap();
+            let b = es.new_value_apply(&f, &null).unwrap();
+            let list = es.new_value_list([a, b]).unwrap();
+            let length = es.eval_from_string("builtins.length", "<test>").unwrap();
+            let n = es.call(length, list.clone()).unwrap();
+            assert_eq!(es.require_int(&n).unwrap(), 2);
+            // Forcing the element raises the abort. Construction and
+            // `builtins.length` therefore did not force it.
+            let err = es.require_list_select_idx_strict(&list, 1).err().unwrap();
+            assert!(err.to_string().contains("test element's abort message"));
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_value_list_in_expression() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let items = [
+                es.new_value_str("a").unwrap(),
+                es.new_value_str("b").unwrap(),
+                es.new_value_str("c").unwrap(),
+            ];
+            let list = es.new_value_list(items).unwrap();
+            let f = es
+                .eval_from_string(
+                    "l: \"${toString (builtins.length l)}${builtins.elemAt l 1}\"",
+                    "<test>",
+                )
+                .unwrap();
+            let s = es.call(f, list).unwrap();
+            assert_eq!(es.require_string(&s).unwrap(), "3b");
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_value_list_len_too_large() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let items = vec![es.new_value_int(1).unwrap(), es.new_value_int(2).unwrap()];
+            let iter = LyingLen {
+                inner: items.into_iter(),
+                len: 3,
+            };
+            let err = es.new_value_list(iter).err().unwrap();
+            assert_eq!(
+                err.to_string(),
+                "new_value_list: iterator yielded only 2 of the 3 items its len() promised"
+            );
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn eval_state_new_value_list_len_too_small() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let items = vec![
+                es.new_value_int(1).unwrap(),
+                es.new_value_int(2).unwrap(),
+                es.new_value_int(3).unwrap(),
+            ];
+            let iter = LyingLen {
+                inner: items.into_iter(),
+                len: 2,
+            };
+            let err = es.new_value_list(iter).err().unwrap();
+            assert_eq!(
+                err.to_string(),
+                "new_value_list: iterator yielded more items than its len() of 2"
+            );
+        })
+        .unwrap();
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn eval_state_new_value_list_len_above_u32() {
+        gc_registering_current_thread(|| {
+            let store = Store::open(None, []).unwrap();
+            let mut es = EvalState::new(store, []).unwrap();
+            let iter = LyingLen {
+                inner: std::iter::empty(),
+                len: u32::MAX as usize + 1,
+            };
+            let err = es.new_value_list(iter).err().unwrap();
+            assert_eq!(
+                err.to_string(),
+                "new_value_list: len() of 4294967296 does not fit the unsigned int index of nix_list_builder_insert"
             );
         })
         .unwrap();
